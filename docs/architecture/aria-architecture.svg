@@ -1,0 +1,257 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 980" width="900" height="980" font-family="ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace">
+
+  <!-- Background -->
+  <rect width="900" height="980" fill="#0d1117" rx="12"/>
+
+  <!-- Title -->
+  <text x="450" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="#e6edf3" letter-spacing="3">ARIA — PLATFORM ARCHITECTURE</text>
+  <text x="450" y="64" text-anchor="middle" font-size="11" fill="#7d8590" letter-spacing="1">AI Resource &amp; Investment Aggregator · Seven-Layer Design</text>
+
+  <!-- ── LAYER 1: INTAKE ── -->
+  <rect x="40" y="84" width="820" height="90" rx="8" fill="#161b22" stroke="#1f6feb" stroke-width="1.5"/>
+  <rect x="40" y="84" width="4" height="90" rx="2" fill="#1f6feb"/>
+  <text x="64" y="108" font-size="10" font-weight="700" fill="#1f6feb" letter-spacing="2">LAYER 1 · INTAKE</text>
+
+  <!-- Intake boxes -->
+  <rect x="64" y="116" width="220" height="44" rx="6" fill="#1c2c3e" stroke="#1f6feb" stroke-width="0.75"/>
+  <text x="174" y="134" text-anchor="middle" font-size="11" font-weight="600" fill="#79c0ff">Intake form</text>
+  <text x="174" y="150" text-anchor="middle" font-size="9.5" fill="#7d8590">Standardized structured submission</text>
+
+  <rect x="300" y="116" width="220" height="44" rx="6" fill="#1c2c3e" stroke="#1f6feb" stroke-width="0.75"/>
+  <text x="410" y="134" text-anchor="middle" font-size="11" font-weight="600" fill="#79c0ff">Prioritization engine</text>
+  <text x="410" y="150" text-anchor="middle" font-size="9.5" fill="#7d8590">Claude AI scoring · 6 dimensions · 1–5</text>
+
+  <rect x="536" y="116" width="300" height="44" rx="6" fill="#1c2c3e" stroke="#1f6feb" stroke-width="0.75"/>
+  <text x="686" y="134" text-anchor="middle" font-size="11" font-weight="600" fill="#79c0ff">Validation &amp; routing</text>
+  <text x="686" y="150" text-anchor="middle" font-size="9.5" fill="#7d8590">Configurable approval workflow · AI CoE · Finance · Risk</text>
+
+  <!-- Arrows between intake boxes -->
+  <line x1="284" y1="138" x2="298" y2="138" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="520" y1="138" x2="534" y2="138" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── LAYER 2: LIFECYCLE ── -->
+  <rect x="40" y="194" width="820" height="90" rx="8" fill="#161b22" stroke="#e3b341" stroke-width="1.5"/>
+  <rect x="40" y="194" width="4" height="90" rx="2" fill="#e3b341"/>
+  <text x="64" y="218" font-size="10" font-weight="700" fill="#e3b341" letter-spacing="2">LAYER 2 · LIFECYCLE STAGE ENGINE</text>
+
+  <!-- 8 stage pills -->
+  <rect x="64"  y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="106" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Ideation</text>
+  <text x="106" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Intake in</text>
+
+  <rect x="156" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="198" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Assessment</text>
+  <text x="198" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Scored &amp; evaluated</text>
+
+  <rect x="248" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="290" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Approved</text>
+  <text x="290" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Budget committed</text>
+
+  <rect x="340" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="382" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">In dev</text>
+  <text x="382" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Build underway</text>
+
+  <rect x="432" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="474" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Piloting</text>
+  <text x="474" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">KPIs monitored</text>
+
+  <rect x="524" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="566" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Live</text>
+  <text x="566" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Full rollout</text>
+
+  <rect x="616" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="658" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Scaled</text>
+  <text x="658" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Firm-wide</text>
+
+  <rect x="708" y="226" width="84" height="44" rx="6" fill="#1e1c0e" stroke="#e3b341" stroke-width="0.75"/>
+  <text x="750" y="244" text-anchor="middle" font-size="10" font-weight="600" fill="#e3b341">Retired</text>
+  <text x="750" y="258" text-anchor="middle" font-size="8.5" fill="#7d8590">Archived</text>
+
+  <!-- Stage flow arrows -->
+  <line x1="148" y1="248" x2="154" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+  <line x1="240" y1="248" x2="246" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+  <line x1="332" y1="248" x2="338" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+  <line x1="424" y1="248" x2="430" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+  <line x1="516" y1="248" x2="522" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+  <line x1="608" y1="248" x2="614" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+  <line x1="700" y1="248" x2="706" y2="248" stroke="#e3b341" stroke-width="1" marker-end="url(#arryellow)" opacity="0.6"/>
+
+  <!-- ── LAYER 3: REPOSITORY ── -->
+  <rect x="40" y="304" width="820" height="110" rx="8" fill="#161b22" stroke="#bc8cff" stroke-width="1.5"/>
+  <rect x="40" y="304" width="4" height="110" rx="2" fill="#bc8cff"/>
+  <text x="64" y="328" font-size="10" font-weight="700" fill="#bc8cff" letter-spacing="2">LAYER 3 · USE CASE REPOSITORY</text>
+
+  <!-- Repository sub-boxes row 1 -->
+  <rect x="64"  y="336" width="136" height="34" rx="5" fill="#1e1630" stroke="#bc8cff" stroke-width="0.75"/>
+  <text x="132" y="349" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">Core metadata</text>
+  <text x="132" y="362" text-anchor="middle" font-size="8.5" fill="#7d8590">BU · sponsor · owner</text>
+
+  <rect x="208" y="336" width="136" height="34" rx="5" fill="#1e1630" stroke="#bc8cff" stroke-width="0.75"/>
+  <text x="276" y="349" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">KPIs &amp; metrics</text>
+  <text x="276" y="362" text-anchor="middle" font-size="8.5" fill="#7d8590">Defined at intake</text>
+
+  <rect x="352" y="336" width="136" height="34" rx="5" fill="#1e1630" stroke="#bc8cff" stroke-width="0.75"/>
+  <text x="420" y="349" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">Financial data</text>
+  <text x="420" y="362" text-anchor="middle" font-size="8.5" fill="#7d8590">Cost · spend · ROI</text>
+
+  <rect x="496" y="336" width="136" height="34" rx="5" fill="#1e1630" stroke="#bc8cff" stroke-width="0.75"/>
+  <text x="564" y="349" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">Docs &amp; links</text>
+  <text x="564" y="362" text-anchor="middle" font-size="8.5" fill="#7d8590">Decisions · assets</text>
+
+  <rect x="640" y="336" width="196" height="34" rx="5" fill="#1e1630" stroke="#bc8cff" stroke-width="0.75"/>
+  <text x="738" y="349" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">Audit trail</text>
+  <text x="738" y="362" text-anchor="middle" font-size="8.5" fill="#7d8590">Immutable · timestamped · full history</text>
+
+  <!-- Vendor registry row -->
+  <rect x="64" y="378" width="380" height="28" rx="5" fill="#12101e" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4 2"/>
+  <text x="254" y="392" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">Vendor &amp; tool registry</text>
+  <text x="254" y="401" text-anchor="middle" font-size="8" fill="#7d8590"> </text>
+
+  <rect x="452" y="378" width="384" height="28" rx="5" fill="#12101e" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4 2"/>
+  <text x="644" y="392" text-anchor="middle" font-size="9.5" font-weight="600" fill="#d2a8ff">Taxonomy · classification · shadow AI detection</text>
+
+  <!-- ── LAYER 4: INTELLIGENCE ── -->
+  <rect x="40" y="434" width="820" height="156" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+  <rect x="40" y="434" width="4" height="156" rx="2" fill="#3fb950"/>
+  <text x="64" y="458" font-size="10" font-weight="700" fill="#3fb950" letter-spacing="2">LAYER 4 · INTELLIGENCE</text>
+
+  <!-- Row 1 of intelligence modules -->
+  <rect x="64"  y="466" width="182" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="155" y="484" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Adoption monitor</text>
+  <text x="155" y="498" text-anchor="middle" font-size="8.5" fill="#7d8590">Usage · rollout % · change mgmt</text>
+  <text x="155" y="509" text-anchor="middle" font-size="8.5" fill="#7d8590">milestones by BU</text>
+
+  <rect x="256" y="466" width="182" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="347" y="484" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Impact tracker</text>
+  <text x="347" y="498" text-anchor="middle" font-size="8.5" fill="#7d8590">Realized value vs. projections</text>
+  <text x="347" y="509" text-anchor="middle" font-size="8.5" fill="#7d8590">made at intake</text>
+
+  <rect x="448" y="466" width="182" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="539" y="484" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Cost &amp; ROI engine</text>
+  <text x="539" y="498" text-anchor="middle" font-size="8.5" fill="#7d8590">Actual spend · payback period</text>
+  <text x="539" y="509" text-anchor="middle" font-size="8.5" fill="#7d8590">ROI % over time</text>
+
+  <rect x="640" y="466" width="196" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="738" y="484" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Benefits realization</text>
+  <text x="738" y="498" text-anchor="middle" font-size="8.5" fill="#7d8590">30 / 60 / 90-day post-Live</text>
+  <text x="738" y="509" text-anchor="middle" font-size="8.5" fill="#7d8590">KPI validation · owner assigned</text>
+
+  <!-- Row 2 of intelligence modules -->
+  <rect x="64"  y="524" width="182" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="155" y="542" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Strategic alignment</text>
+  <text x="155" y="556" text-anchor="middle" font-size="8.5" fill="#7d8590">Maps to firm pillars</text>
+  <text x="155" y="567" text-anchor="middle" font-size="8.5" fill="#7d8590">drift detection</text>
+
+  <rect x="256" y="524" width="182" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="347" y="542" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">External benchmarking</text>
+  <text x="347" y="556" text-anchor="middle" font-size="8.5" fill="#7d8590">vs. industry peers</text>
+  <text x="347" y="567" text-anchor="middle" font-size="8.5" fill="#7d8590">sector medians</text>
+
+  <rect x="448" y="524" width="182" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="539" y="542" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Risk &amp; compliance</text>
+  <text x="539" y="556" text-anchor="middle" font-size="8.5" fill="#7d8590">Model drift · data governance</text>
+  <text x="539" y="567" text-anchor="middle" font-size="8.5" fill="#7d8590">regulatory exposure</text>
+
+  <rect x="640" y="524" width="196" height="48" rx="6" fill="#0d1f12" stroke="#3fb950" stroke-width="0.75"/>
+  <text x="738" y="542" text-anchor="middle" font-size="10" font-weight="600" fill="#56d364">Resource tracker</text>
+  <text x="738" y="556" text-anchor="middle" font-size="8.5" fill="#7d8590">Headcount · budget · tooling</text>
+  <text x="738" y="567" text-anchor="middle" font-size="8.5" fill="#7d8590">across full portfolio</text>
+
+  <!-- ── LAYER 5: REPORTING ── -->
+  <rect x="40" y="610" width="820" height="90" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+  <rect x="40" y="610" width="4" height="90" rx="2" fill="#58a6ff"/>
+  <text x="64" y="634" font-size="10" font-weight="700" fill="#58a6ff" letter-spacing="2">LAYER 5 · REPORTING</text>
+
+  <rect x="64"  y="644" width="186" height="44" rx="6" fill="#0d1826" stroke="#58a6ff" stroke-width="0.75"/>
+  <text x="157" y="662" text-anchor="middle" font-size="10" font-weight="600" fill="#79c0ff">Executive dashboard</text>
+  <text x="157" y="677" text-anchor="middle" font-size="8.5" fill="#7d8590">C-suite · live / real-time</text>
+
+  <rect x="260" y="644" width="186" height="44" rx="6" fill="#0d1826" stroke="#58a6ff" stroke-width="0.75"/>
+  <text x="353" y="662" text-anchor="middle" font-size="10" font-weight="600" fill="#79c0ff">Portfolio scorecard</text>
+  <text x="353" y="677" text-anchor="middle" font-size="8.5" fill="#7d8590">BU leads · AI CoE · monthly</text>
+
+  <rect x="456" y="644" width="186" height="44" rx="6" fill="#0d1826" stroke="#58a6ff" stroke-width="0.75"/>
+  <text x="549" y="662" text-anchor="middle" font-size="10" font-weight="600" fill="#79c0ff">Adoption report</text>
+  <text x="549" y="677" text-anchor="middle" font-size="8.5" fill="#7d8590">Change mgmt · HR · monthly</text>
+
+  <rect x="652" y="644" width="184" height="44" rx="6" fill="#0d1826" stroke="#58a6ff" stroke-width="0.75"/>
+  <text x="744" y="662" text-anchor="middle" font-size="10" font-weight="600" fill="#79c0ff">ROI &amp; benchmark</text>
+  <text x="744" y="677" text-anchor="middle" font-size="8.5" fill="#7d8590">CFO · finance · quarterly</text>
+
+  <!-- ── LAYER 6: GOVERNANCE ── -->
+  <rect x="40" y="720" width="820" height="76" rx="8" fill="#161b22" stroke="#f78166" stroke-width="1.5"/>
+  <rect x="40" y="720" width="4" height="76" rx="2" fill="#f78166"/>
+  <text x="64" y="744" font-size="10" font-weight="700" fill="#f78166" letter-spacing="2">LAYER 6 · GOVERNANCE</text>
+
+  <rect x="64"  y="752" width="148" height="32" rx="5" fill="#1e100d" stroke="#f78166" stroke-width="0.75"/>
+  <text x="138" y="772" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffa198">AI review committee</text>
+
+  <rect x="220" y="752" width="148" height="32" rx="5" fill="#1e100d" stroke="#f78166" stroke-width="0.75"/>
+  <text x="294" y="772" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffa198">Approval workflows</text>
+
+  <rect x="376" y="752" width="148" height="32" rx="5" fill="#1e100d" stroke="#f78166" stroke-width="0.75"/>
+  <text x="450" y="772" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffa198">Change control</text>
+
+  <rect x="532" y="752" width="148" height="32" rx="5" fill="#1e100d" stroke="#f78166" stroke-width="0.75"/>
+  <text x="606" y="772" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffa198">Escalation paths</text>
+
+  <rect x="688" y="752" width="148" height="32" rx="5" fill="#1e100d" stroke="#f78166" stroke-width="0.75"/>
+  <text x="762" y="772" text-anchor="middle" font-size="9.5" font-weight="600" fill="#ffa198">Audit trail</text>
+
+  <!-- ── LAYER 7: INTEGRATIONS ── -->
+  <rect x="40" y="816" width="820" height="130" rx="8" fill="#161b22" stroke="#7d8590" stroke-width="1.5"/>
+  <rect x="40" y="816" width="4" height="130" rx="2" fill="#7d8590"/>
+  <text x="64" y="840" font-size="10" font-weight="700" fill="#8b949e" letter-spacing="2">LAYER 7 · INTEGRATIONS</text>
+
+  <!-- Integration pill row 1 -->
+  <rect x="64"  y="850" width="108" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="118" y="865" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">People &amp; HR</text>
+  <text x="118" y="880" text-anchor="middle" font-size="8" fill="#484f58">Workday · SAP SF · ADP</text>
+
+  <rect x="180" y="850" width="108" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="234" y="865" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">Finance &amp; ERP</text>
+  <text x="234" y="880" text-anchor="middle" font-size="8" fill="#484f58">SAP · Oracle · Coupa</text>
+
+  <rect x="296" y="850" width="108" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="350" y="865" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">Project mgmt</text>
+  <text x="350" y="880" text-anchor="middle" font-size="8" fill="#484f58">Jira · ADO · ServiceNow</text>
+
+  <rect x="412" y="850" width="108" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="466" y="865" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">Collaboration</text>
+  <text x="466" y="880" text-anchor="middle" font-size="8" fill="#484f58">Slack · Teams · Confluence</text>
+
+  <rect x="528" y="850" width="108" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="582" y="865" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">Identity &amp; SSO</text>
+  <text x="582" y="880" text-anchor="middle" font-size="8" fill="#484f58">Okta · Azure AD · SAML</text>
+
+  <rect x="644" y="850" width="108" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="698" y="865" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">BI &amp; analytics</text>
+  <text x="698" y="880" text-anchor="middle" font-size="8" fill="#484f58">Power BI · Tableau · Looker</text>
+
+  <!-- Integration row 2 - AI Platforms centered -->
+  <rect x="296" y="896" width="308" height="38" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+  <text x="450" y="911" text-anchor="middle" font-size="9.5" font-weight="600" fill="#8b949e">AI platforms</text>
+  <text x="450" y="926" text-anchor="middle" font-size="8" fill="#484f58">Azure OpenAI · AWS Bedrock · Google Vertex · usage metrics · compute cost</text>
+
+  <!-- ── VERTICAL FLOW ARROWS (between layers) ── -->
+  <line x1="450" y1="174" x2="450" y2="192" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="450" y1="284" x2="450" y2="302" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="450" y1="414" x2="450" y2="432" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="450" y1="590" x2="450" y2="608" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="450" y1="700" x2="450" y2="718" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="450" y1="796" x2="450" y2="814" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ── ARROWHEAD MARKERS ── -->
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 2L8 5L2 8" fill="none" stroke="#30363d" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="arryellow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M2 2L8 5L2 8" fill="none" stroke="#e3b341" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- Footer -->
+  <text x="450" y="960" text-anchor="middle" font-size="9" fill="#484f58">Built with Claude AI · github.com/ai-products-builder · Preethi Sannathi</text>
+
+</svg>
