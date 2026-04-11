@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARIA — AI Initiative Intake</title>
+  <meta name="description" content="ARIA AI Resource & Investment Aggregator — Submit a new AI initiative for AI CoE review." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: "DM Sans", system-ui, sans-serif; background: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+const { useState } = React;
+
+const C = {
+  navy: "#1a1a1a",
+  blue: "#f0f0f0",
+  blueMid: "#d0d0d0",
+  blueDeep: "#444444",
+  sage: "#f0f0f0",
+  sageMid: "#d0d0d0",
+  sageDeep: "#444444",
+  sky: "#f0f0f0",
+  skyMid: "#d0d0d0",
+  skyDeep: "#444444",
+  blush: "#f0f0f0",
+  blushMid: "#d0d0d0",
+  blushDeep: "#444444",
+  peach: "#f0f0f0",
+  peachMid: "#d0d0d0",
+  peachDeep: "#444444",
+  mist: "#f2f2f2",
+  mistDark: "#e0e0e0",
+  border: "#d4d4d4",
+  text: "#1a1a1a",
+  textMid: "#555555",
+  textLight: "#999999",
+  white: "#ffffff",
+  warn: "#fff8e8",
+  warnBorder: "#e0c060",
+  warnText: "#7a4d00",
+};
+
+const STEP_COLORS = [
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
+];
+
+const VENDORS = [
+  { group: "Anthropic / Claude", options: ["Claude (Anthropic)"] },
+  { group: "AI coding & dev tools", options: ["Cursor", "GitHub Copilot", "Tabnine", "Codeium"] },
+  { group: "Foundation model platforms", options: ["Azure OpenAI", "AWS Bedrock", "Google Vertex AI", "Hugging Face"] },
+  { group: "Enterprise AI platforms", options: ["Salesforce Einstein", "ServiceNow AI", "Microsoft Copilot (M365)", "IBM watsonx"] },
+  { group: "Productivity & automation", options: ["Notion AI", "Glean", "Moveworks", "Writer"] },
+  { group: "Data & analytics AI", options: ["Databricks (DBRX)", "Snowflake Cortex", "DataRobot"] },
+  { group: "Other", options: ["Other / not listed", "Internal / proprietary model"] },
+];
+
+const REGISTRY = ["Claude (Anthropic)","Azure OpenAI","AWS Bedrock","Google Vertex AI","GitHub Copilot","Microsoft Copilot (M365)","Salesforce Einstein","ServiceNow AI","IBM watsonx","Snowflake Cortex","Databricks (DBRX)","DataRobot","Glean","Moveworks","Writer","Internal / proprietary model"];
+const PROBLEM_TYPES = ["Automation","Decision support","Data extraction","Content generation","Prediction / forecasting","Search & retrieval","Monitoring & alerting","Client experience"];
+const PILLARS = ["Operational excellence","Investment performance","Client outcomes","Risk & compliance","Data & technology modernization","Growth & distribution"];
+const KPI_CATS = ["Time savings","Error reduction","Cost avoidance","Adoption rate","Revenue impact","Risk reduction","SLA / cycle time","User satisfaction (NPS / CSAT)"];
+const UX_METHODS = ["User interviews","CSAT survey","NPS","Usage analytics","Quarterly business review","Not planned"];
+const REGS = ["SEC","FINRA","GDPR","CCPA","SOX","MiFID II","None identified"];
+const LEGAL_AREAS = ["Vendor / third-party contracts","Data licensing","IP / model ownership","Regulatory obligation","Privacy / data protection"];
+const ROLES = ["Product manager","Data scientist","ML engineer","Software engineer","Business analyst","Data engineer","UX designer","Risk & compliance","Project manager","Change management lead"];
+const STEPS = ["Basics","Problem","Strategy","Financials","KPIs","Risk","Team"];
+const STEP_TITLES = ["Basic information","Problem statement","Strategic alignment","Investment & return","KPIs & success metrics","Risk & compliance","Team & resources"];
+const STEP_SUBS = [
+  "Tell us what this AI initiative is and who owns it.",
+  "Describe the problem this initiative solves and why it matters now.",
+  "Show how this initiative connects to firm-level priorities.",
+  "All financials will be reviewed by Finance. Every number requires a source or formula.",
+  "Define how success will be measured. KPIs are tracked at Day 30, 60, and 90 post-launch.",
+  "Identify risks before they become blockers. High-risk items trigger automatic review.",
+  "Specify who is needed to deliver this initiative.",
+];
+
+function genId() { return "ARIA-2026-" + (Math.floor(Math.random() * 9000) + 1000); }
+function today() { return new Date().toISOString().split("T")[0]; }
+function sixMonths() { const d = new Date(); d.setMonth(d.getMonth()+6); return d.toISOString().split("T")[0]; }
+function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
+function pf(v) { return parseFloat(v) || 0; }
+
+function TagGroup({ options, selected, onChange, accent }) {
+  const ac = accent || C.blueDeep;
+  const toggle = opt => onChange(selected.includes(opt) ? selected.filter(x=>x!==opt) : [...selected, opt]);
+  return (
+    <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:6 }}>
+      {options.map(opt => (
+        <button key={opt} onClick={()=>toggle(opt)} style={{
+          padding:"5px 14px", fontSize:13, borderRadius:99, cursor:"pointer", fontFamily:"inherit",
+          border: selected.includes(opt) ? `1.5px solid ${ac}` : `1px solid ${C.border}`,
+          background: selected.includes(opt) ? "#ebebeb" : C.white,
+          color: selected.includes(opt) ? C.navy : C.textMid,
+          fontWeight: selected.includes(opt) ? 600 : 400, transition:"all 0.12s",
+        }}>{opt}</button>
+      ))}
+    </div>
+  );
+}
+
+function Field({ label, required, hint, children }) {
+  return (
+    <div style={{ marginBottom:20 }}>
+      <label style={{ display:"block", fontSize:13, fontWeight:600, color:C.textMid, marginBottom:6 }}>
+        {label}{required && <span style={{ color:"#d04040", marginLeft:3 }}>*</span>}
+      </label>
+      {children}
+      {hint && <div style={{ fontSize:12, color:C.textLight, marginTop:5 }}>{hint}</div>}
+    </div>
+  );
+}
+
+const iStyle = { width:"100%", fontSize:14, padding:"9px 11px", border:`1px solid ${C.border}`, borderRadius:8, fontFamily:"inherit", color:C.text, background:"#ffffff", outline:"none", boxSizing:"border-box" };
+function Input(p) { return <input {...p} style={{...iStyle,...p.style}} />; }
+function Sel({ children, ...p }) { return <select {...p} style={{...iStyle,...p.style}}>{children}</select>; }
+function TA(p) { return <textarea {...p} style={{...iStyle, resize:"vertical", lineHeight:1.6,...p.style}} />; }
+function TwoCol({ children }) { return <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>{children}</div>; }
+function ThreeCol({ children }) { return <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:16 }}>{children}</div>; }
+
+function Divider({ children, accent }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:10, margin:"24px 0 16px" }}>
+      <div style={{ width:4, height:16, borderRadius:99, background: accent||C.blueDeep, flexShrink:0 }} />
+      <span style={{ fontSize:11, fontWeight:700, color: accent||C.blueDeep, textTransform:"uppercase", letterSpacing:"0.08em", whiteSpace:"nowrap" }}>{children}</span>
+      <div style={{ flex:1, height:1, background:C.mistDark }} />
+    </div>
+  );
+}
+
+function RadioGroup({ name, options, value, onChange, accent }) {
+  const ac = accent || C.blueDeep;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:6 }}>
+      {options.map(opt => (
+        <label key={opt.value||opt} onClick={()=>onChange(opt.value||opt)} style={{
+          display:"flex", alignItems:"flex-start", gap:10, padding:"10px 14px",
+          border: value===(opt.value||opt) ? `1.5px solid ${ac}` : `1px solid ${C.border}`,
+          borderRadius:10, cursor:"pointer",
+          background: value===(opt.value||opt) ? "#ebebeb" : C.white,
+        }}>
+          <input type="radio" name={name} checked={value===(opt.value||opt)} onChange={()=>onChange(opt.value||opt)} style={{ marginTop:2 }} />
+          <div>
+            <div style={{ fontSize:13, color:C.text, fontWeight:500 }}>{opt.label||opt}</div>
+            {opt.sub && <div style={{ fontSize:12, color:C.textLight, marginTop:2 }}>{opt.sub}</div>}
+          </div>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function ValBox({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize:13, fontWeight:600, color:C.textMid, marginBottom:6 }}>{label}</div>
+      <div style={{ background:"#f0f0f0", border:"1px solid #d0d0d0", borderRadius:8, padding:"10px 14px", fontSize:15, fontWeight:700, color:"#1a1a1a", textAlign:"right" }}>{value}</div>
+    </div>
+  );
+}
+
+function KpiRow({ kpi, onChange, onRemove, index }) {
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 120px 110px 110px 30px", gap:8, alignItems:"center", marginBottom:8 }}>
+      <Sel value={kpi.name} onChange={e=>onChange(index,"name",e.target.value)}>
+        <option value="">Select KPI</option>
+        {["Hours saved per user per week","Error rate in processed records","User adoption rate","Cost avoided (annual)","Cycle time reduction","NPS / CSAT score","Revenue impact ($)","Incidents prevented","SLA compliance rate"].map(o=><option key={o}>{o}</option>)}
+      </Sel>
+      <div style={{ fontSize:12, color:C.textLight, padding:"9px 4px" }}>hrs / week</div>
+      <Input type="number" placeholder="Baseline" value={kpi.baseline} onChange={e=>onChange(index,"baseline",e.target.value)} />
+      <Input type="number" placeholder="Target" value={kpi.target} onChange={e=>onChange(index,"target",e.target.value)} />
+      <button onClick={()=>onRemove(index)} style={{ background:"none", border:"none", cursor:"pointer", color:"#bbbbbb", fontSize:20, padding:0, lineHeight:1 }}>×</button>
+    </div>
+  );
+}
+
+function TeamRow({ row, onChange, onRemove, index }) {
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 90px 30px", gap:8, alignItems:"center", marginBottom:8 }}>
+      <Sel value={row.role} onChange={e=>onChange(index,"role",e.target.value)}>
+        <option value="">Select role</option>
+        {ROLES.map(r=><option key={r}>{r}</option>)}
+      </Sel>
+      <Input type="text" placeholder="Name or team" value={row.name} onChange={e=>onChange(index,"name",e.target.value)} />
+      <Input type="number" placeholder="%" min="0" max="100" value={row.pct} onChange={e=>onChange(index,"pct",e.target.value)} />
+      <button onClick={()=>onRemove(index)} style={{ background:"none", border:"none", cursor:"pointer", color:"#bbbbbb", fontSize:20, padding:0, lineHeight:1 }}>×</button>
+    </div>
+  );
+}
+
+function ARIAIntakeForm() {
+  const [step, setStep] = useState(1);
+  const [useCaseId] = useState(genId);
+  const [submitted, setSubmitted] = useState(false);
+
+  const [s1, setS1] = useState({ name:"AI-Powered Trade Reconciliation Assistant", businessLine:"Operations", team:"Trade Operations", sponsor:"Sarah Chen, Chief Operating Officer", owner:"Marcus Obi, VP Trade Operations", startDate:"2026-05-01", goLiveDate:"2026-10-15", vendor:"Claude (Anthropic)", otherVendor:"" });
+  const [s2, setS2] = useState({ problem:"Trade operations analysts spend 3–4 hours per day manually reconciling discrepancies between our order management system and custodian records. The process is entirely manual — analysts pull data from 4 separate systems, paste into Excel, and cross-reference line by line. Error rates average 2.3% per month, each requiring costly remediation averaging $4,200 per incident.", adopters:"62 trade operations analysts across 3 regional teams (Americas, EMEA, APAC). All 62 are primary users from day one. Secondary users include 12 portfolio managers who consume reconciliation reports.", whyNow:"Trade volume has grown 34% YoY and we are onboarding two new custodians in Q3 2026. Manual capacity cannot scale. The SEC's updated Rule 17a-3 record-keeping requirements effective January 2027 also increase the compliance burden on current manual processes.", inaction:"Without automation, we will need to hire 8 additional analysts at $120K fully-loaded each ($960K/yr) to keep pace with volume growth. Continued error rates expose us to regulatory scrutiny and potential client reporting failures.", problemTypes:["Automation","Data extraction","Monitoring & alerting"] });
+  const [s3, setS3] = useState({ pillars:["Operational excellence","Risk & compliance"], howAligned:"Automating reconciliation directly advances our operational excellence pillar by eliminating the highest-volume manual process in Trade Operations. It also supports risk & compliance by reducing human error in regulatory reporting and positioning us ahead of the January 2027 SEC Rule 17a-3 changes.", roadmap:"yes", dependencies:"Depends on the Data Fabric initiative (ARIA-2026-0018) for unified data access layer. Overlaps with the Custodian API integration project (IT-2025-114) — coordination required on data schema." });
+  const [s4, setS4] = useState({ totalCost:"485000", confidence:"Budgetary estimate (±25%)", buildCost:"280000", licenseCost:"95000", runCost:"110000", returnType:"efficiency", costFTEs:"", costTimePct:"", costSalary:"", costLicenses:"", costLicenseAmt:"", costInfra:"", effHrs:"186", effRate:"72", effErrors:"28", effErrorCost:"4200", effQueries:"", effQueryCost:"", revDeals:"", revDealValue:"", revLift:"", revBase:"", riskProb:"", riskIncident:"", riskFine:"", riskFineLikely:"", mixCost:"", mixEff:"", mixRev:"", mixRisk:"" });
+  const [s5, setS5] = useState({ kpiCats:["Time savings","Error reduction","Adoption rate"], kpis:[{name:"Hours saved per user per week",baseline:"3.5",target:"0.5"},{name:"Error rate in processed records",baseline:"2.3",target:"0.3"},{name:"User adoption rate",baseline:"0",target:"90"}], measureMethod:"Hours saved tracked via analyst time-log surveys (bi-weekly). Error rate pulled from reconciliation audit log in OMS — automated report generated weekly by Data Engineering. Adoption rate via Azure AD login analytics dashboard.", realizationOwner:"Priya Nair, Senior Manager Trade Operations", success90:"All 62 analysts are actively using the tool daily. Manual Excel reconciliation has been eliminated for standard trade types. Analysts report spending less than 30 minutes per day on reconciliation vs. the current 3–4 hours.", success12mo:"The tool handles 95%+ of reconciliation volume autonomously. Analysts are redeployed to exception management and counterparty relationship work. The team proactively requests expansion to cover new custodians and asset classes.", uxMethods:["User interviews","CSAT survey","Usage analytics"] });
+  const [s6, setS6] = useState({ dataClass:"Confidential", clientData:"no", regs:["SEC","FINRA","SOX"], modelRisk:"Medium — AI-assisted, human in the loop", legalNeeded:"yes", legalStatus:"In progress", legalAreas:["Vendor / third-party contracts","Data licensing"], risks:"1. Model may misclassify edge-case trade types (e.g. multi-leg derivatives, cross-currency swaps) — mitigation: human review gate for any trade flagged as low-confidence.\n2. Data quality: OMS feed has known latency issues during peak settlement windows — mitigation: reconciliation runs scheduled for off-peak hours.\n3. Claude API dependency: if Anthropic API is unavailable, fallback to manual queue — runbook required." });
+  const [s7, setS7] = useState({ team:[{role:"Product manager",name:"Marcus Obi",pct:"50"},{role:"ML engineer",name:"Data & Technology — TBD hire",pct:"100"},{role:"Software engineer",name:"James Lim, Platform Engineering",pct:"75"},{role:"Business analyst",name:"Anika Sharma, Trade Ops",pct:"50"},{role:"Risk & compliance",name:"David Torres, Compliance",pct:"25"}], constraints:"ML engineer role is currently open — requisition submitted, target hire date May 2026. If hire is delayed beyond June, go-live date will slip by 6–8 weeks. James Lim is also allocated 25% to the Custodian API project — coordination with IT-2025-114 PM required.", notes:"This submission has been pre-reviewed informally with the AI CoE in March 2026. Sarah Chen has committed budget subject to formal AI CoE approval. Recommend fast-tracking to Assessment stage given regulatory timeline pressure from SEC Rule 17a-3." });
+
+  const shadowAI = s1.vendor && !REGISTRY.includes(s1.vendor);
+  const sc = STEP_COLORS[step-1];
+
+  function calcAV() {
+    const rt = s4.returnType;
+    if(rt==="cost") return pf(s4.costFTEs)*(pf(s4.costTimePct)/100)*pf(s4.costSalary)+pf(s4.costLicenses)*pf(s4.costLicenseAmt)+pf(s4.costInfra);
+    if(rt==="efficiency") return pf(s4.effHrs)*52*pf(s4.effRate)+pf(s4.effErrors)*12*pf(s4.effErrorCost)+pf(s4.effQueries)*12*pf(s4.effQueryCost);
+    if(rt==="revenue") return pf(s4.revDeals)*pf(s4.revDealValue)+(pf(s4.revLift)/100)*pf(s4.revBase);
+    if(rt==="risk") return (pf(s4.riskProb)/100)*pf(s4.riskIncident)+pf(s4.riskFine)*(pf(s4.riskFineLikely)/100);
+    if(rt==="mix") return pf(s4.mixCost)+pf(s4.mixEff)+pf(s4.mixRev)+pf(s4.mixRisk);
+    return 0;
+  }
+  const av = calcAV();
+  const tc = pf(s4.totalCost);
+  const payback = av > 0 && tc > 0 ? Math.round((tc/av)*12) : null;
+
+  function updKpi(i,f,v){ const k=[...s5.kpis]; k[i]={...k[i],[f]:v}; setS5({...s5,kpis:k}); }
+  function addKpi(){ setS5({...s5,kpis:[...s5.kpis,{name:"",baseline:"",target:""}]}); }
+  function rmKpi(i){ setS5({...s5,kpis:s5.kpis.filter((_,idx)=>idx!==i)}); }
+  function updTeam(i,f,v){ const t=[...s7.team]; t[i]={...t[i],[f]:v}; setS7({...s7,team:t}); }
+  function addTeam(){ setS7({...s7,team:[...s7.team,{role:"",name:"",pct:""}]}); }
+  function rmTeam(i){ setS7({...s7,team:s7.team.filter((_,idx)=>idx!==i)}); }
+
+  if(submitted) return (
+    <div style={{ background:"#f2f2f2", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"'DM Sans','Nunito',system-ui,sans-serif" }}>
+      <div style={{ background:C.white, borderRadius:20, padding:"48px 40px", maxWidth:480, width:"100%", textAlign:"center" }}>
+        <div style={{ width:64, height:64, borderRadius:"50%", background:"#ebebeb", border:"2px solid #cccccc", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:26, color:"#333333" }}>✓</div>
+        <div style={{ fontSize:24, fontWeight:800, color:C.navy, marginBottom:8 }}>Submission received</div>
+        <div style={{ fontSize:14, color:C.textMid, lineHeight:1.7, marginBottom:28 }}>Your AI initiative has been submitted to the AI CoE for review. You'll receive a notification within 10 business days.</div>
+        <div style={{ background:"#ebebeb", border:"1px solid #cccccc", borderRadius:12, padding:"14px 24px", marginBottom:32, display:"inline-block" }}>
+          <div style={{ fontSize:11, color:"#555555", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Use case ID</div>
+          <div style={{ fontSize:20, fontWeight:800, fontFamily:"monospace", color:C.navy }}>{useCaseId}</div>
+        </div>
+        <div><button onClick={()=>{setSubmitted(false);setStep(1);}} style={{ padding:"11px 28px", background:C.navy, color:C.white, border:"none", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Submit another initiative</button></div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ background:C.mist, minHeight:"100vh", fontFamily:"'DM Sans','Nunito',system-ui,sans-serif" }}>
+
+      <div style={{ background:"#1a1a1a", padding:"0 32px" }}>
+        <div style={{ maxWidth:880, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:54 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:28, height:28, borderRadius:8, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:C.navy }}>A</div>
+            <span style={{ fontSize:14, fontWeight:700, color:C.white, letterSpacing:"0.05em" }}>ARIA</span>
+            <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }}>·</span>
+            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>New AI initiative intake</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.12)", borderRadius:8, padding:"5px 12px" }}>
+            <span style={{ fontSize:10, color:"rgba(255,255,255,0.6)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em" }}>ID</span>
+            <span style={{ fontSize:12, fontFamily:"monospace", fontWeight:700, color:"#ffffff" }}>{useCaseId}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background:sc.bg, borderBottom:`1px solid ${sc.mid}`, padding:"0 32px", transition:"background 0.3s" }}>
+        <div style={{ maxWidth:880, margin:"0 auto", display:"flex", overflowX:"auto" }}>
+          {STEPS.map((label,idx)=>{
+            const sn=idx+1, done=sn<step, active=sn===step;
+            return (
+              <button key={sn} onClick={()=>setStep(sn)} style={{
+                display:"flex", alignItems:"center", gap:8, padding:"14px 16px",
+                background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", flexShrink:0,
+                borderBottom: active ? `3px solid ${sc.accent}` : "3px solid transparent",
+              }}>
+                <div style={{
+                  width:22, height:22, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:11, fontWeight:700, flexShrink:0,
+                  background: done ? sc.accent : active ? C.navy : sc.mid,
+                  color: done||active ? C.white : C.textMid,
+                }}>{done ? "✓" : sn}</div>
+                <span style={{ fontSize:12, fontWeight:active?700:500, color:active?C.navy:C.textLight, whiteSpace:"nowrap" }}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ maxWidth:880, margin:"0 auto", padding:"28px 32px 80px" }}>
+        <div style={{ marginBottom:20 }}>
+          <div style={{ fontSize:22, fontWeight:800, color:C.navy }}>{STEP_TITLES[step-1]}</div>
+          <div style={{ fontSize:14, color:C.textMid, marginTop:3 }}>{STEP_SUBS[step-1]}</div>
+        </div>
+
+        <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:16, padding:"28px 32px" }}>
+
+          {step===1 && (<>
+            <div style={{ display:"inline-flex", alignItems:"center", gap:10, padding:"7px 14px", background:"#ebebeb", border:"1px solid #cccccc", borderRadius:10, marginBottom:24 }}>
+              <span style={{ fontSize:11, fontWeight:700, color:"#555555", textTransform:"uppercase", letterSpacing:"0.07em" }}>Use case ID</span>
+              <span style={{ fontSize:13, fontWeight:800, fontFamily:"monospace", color:C.navy }}>{useCaseId}</span>
+              <span style={{ fontSize:11, padding:"2px 8px", background:"#d0d0d0", borderRadius:99, color:"#333333", fontWeight:600 }}>Auto-assigned</span>
+            </div>
+            <Field label="AI initiative name" required>
+              <Input type="text" placeholder="e.g. Automated trade reconciliation assistant" value={s1.name} onChange={e=>setS1({...s1,name:e.target.value})} />
+            </Field>
+            <TwoCol>
+              <Field label="Business line" required>
+                <Sel value={s1.businessLine} onChange={e=>setS1({...s1,businessLine:e.target.value})}>
+                  <option value="">Select business line</option>
+                  {["Investments","Distribution","Finance","Operations","Technology","Legal & Compliance","Human Capital","Client Group"].map(o=><option key={o}>{o}</option>)}
+                </Sel>
+              </Field>
+              <Field label="Business unit / team" required>
+                <Sel value={s1.team} onChange={e=>setS1({...s1,team:e.target.value})}>
+                  <option value="">Select team</option>
+                  {["Equity Research","Fixed Income","Multi-Asset","Portfolio Analytics","Trade Operations","Compliance","Client Reporting","Data & Technology","Risk Management"].map(o=><option key={o}>{o}</option>)}
+                </Sel>
+              </Field>
+            </TwoCol>
+            <TwoCol>
+              <Field label="Executive sponsor" required><Input type="text" placeholder="Full name and title" value={s1.sponsor} onChange={e=>setS1({...s1,sponsor:e.target.value})} /></Field>
+              <Field label="Initiative owner" required><Input type="text" placeholder="Full name — accountable for delivery" value={s1.owner} onChange={e=>setS1({...s1,owner:e.target.value})} /></Field>
+            </TwoCol>
+            <TwoCol>
+              <Field label="Target start date" required><Input type="date" min={today()} value={s1.startDate} onChange={e=>setS1({...s1,startDate:e.target.value})} /></Field>
+              <Field label="Expected go-live date" required><Input type="date" min={today()} value={s1.goLiveDate} onChange={e=>setS1({...s1,goLiveDate:e.target.value})} /></Field>
+            </TwoCol>
+            <Field label="AI tool / vendor" required>
+              <Sel value={s1.vendor} onChange={e=>setS1({...s1,vendor:e.target.value,otherVendor:""})}>
+                <option value="">Select tool or vendor</option>
+                {VENDORS.map(g=><optgroup key={g.group} label={g.group}>{g.options.map(o=><option key={o}>{o}</option>)}</optgroup>)}
+              </Sel>
+              {shadowAI && <div style={{marginTop:8,padding:"8px 12px",background:C.warn,border:`1px solid ${C.warnBorder}`,borderRadius:8,fontSize:12,color:C.warnText}}>This tool is not in the ARIA vendor registry. A shadow AI flag will be raised for AI CoE review upon submission.</div>}
+              {s1.vendor==="Other / not listed" && <Input type="text" placeholder="Enter tool or vendor name" value={s1.otherVendor} onChange={e=>setS1({...s1,otherVendor:e.target.value})} style={{marginTop:8}} />}
+            </Field>
+          </>)}
+
+          {step===2 && (<>
+            <Field label="What problem are you solving?" required>
+              <TA rows={4} placeholder="Describe the current state and the pain point. Be specific — avoid 'improve efficiency' without context." value={s2.problem} onChange={e=>setS2({...s2,problem:e.target.value})} />
+            </Field>
+            <Field label="How many people will adopt this?" required hint="Include team name, role, and rough headcount.">
+              <TA rows={3} placeholder="e.g. 45 trade operations analysts across 3 teams — primary users from day one" value={s2.adopters} onChange={e=>setS2({...s2,adopters:e.target.value})} />
+            </Field>
+            <Field label="Why now?" required>
+              <TA rows={3} placeholder="What has changed — volume, regulation, capacity, competitive pressure — that makes this the right time?" value={s2.whyNow} onChange={e=>setS2({...s2,whyNow:e.target.value})} />
+            </Field>
+            <Field label="What happens if we don't act?">
+              <TA rows={3} placeholder="Describe the cost of inaction — risk exposure, manual burden, missed opportunity" value={s2.inaction} onChange={e=>setS2({...s2,inaction:e.target.value})} />
+            </Field>
+            <Field label="Problem type"><TagGroup options={PROBLEM_TYPES} selected={s2.problemTypes} onChange={v=>setS2({...s2,problemTypes:v})} accent={sc.accent} /></Field>
+          </>)}
+
+          {step===3 && (<>
+            <Field label="Which strategic pillar does this support?" required>
+              <TagGroup options={PILLARS} selected={s3.pillars} onChange={v=>setS3({...s3,pillars:v})} accent={sc.accent} />
+            </Field>
+            <Field label="How does this support the selected pillar?" required>
+              <TA rows={3} placeholder="Explain the direct connection — not just what the initiative does, but how it advances the strategic goal" value={s3.howAligned} onChange={e=>setS3({...s3,howAligned:e.target.value})} />
+            </Field>
+            <Field label="Is this initiative on the approved AI roadmap?">
+              <RadioGroup name="roadmap" value={s3.roadmap} onChange={v=>setS3({...s3,roadmap:v})} accent={sc.accent} options={[
+                {value:"yes",label:"Yes — already on the AI CoE roadmap"},
+                {value:"no",label:"No — new submission not on current roadmap"},
+                {value:"partial",label:"Partial — related to a roadmap item but scope differs"},
+              ]} />
+            </Field>
+            <Field label="Dependencies or related initiatives">
+              <TA rows={2} placeholder="List any other AI initiatives, systems, or data projects this depends on or overlaps with" value={s3.dependencies} onChange={e=>setS3({...s3,dependencies:e.target.value})} />
+            </Field>
+          </>)}
+
+          {step===4 && (<>
+            <Divider accent={sc.accent}>Total investment</Divider>
+            <TwoCol>
+              <Field label="Total estimated cost" required hint="Include build, licensing, compute, and 12-month run-state. Minimum $10,000.">
+                <Input type="number" placeholder="Min $10,000" min={10000} step={1000} value={s4.totalCost} onChange={e=>setS4({...s4,totalCost:e.target.value})} />
+                {s4.totalCost && pf(s4.totalCost)<10000 && <div style={{fontSize:12,color:"#d04040",marginTop:4}}>Minimum investment is $10,000</div>}
+              </Field>
+              <Field label="Cost confidence level">
+                <Sel value={s4.confidence} onChange={e=>setS4({...s4,confidence:e.target.value})}>
+                  <option>Rough order of magnitude (±50%)</option>
+                  <option>Budgetary estimate (±25%)</option>
+                  <option>Detailed estimate (±10%)</option>
+                </Sel>
+              </Field>
+            </TwoCol>
+            <ThreeCol>
+              <Field label="Build / dev cost"><Input type="number" placeholder="$0" value={s4.buildCost} onChange={e=>setS4({...s4,buildCost:e.target.value})} /></Field>
+              <Field label="Licensing / vendor cost"><Input type="number" placeholder="$0" value={s4.licenseCost} onChange={e=>setS4({...s4,licenseCost:e.target.value})} /></Field>
+              <Field label="Annual run cost"><Input type="number" placeholder="$0" value={s4.runCost} onChange={e=>setS4({...s4,runCost:e.target.value})} /></Field>
+            </ThreeCol>
+            <Divider accent={sc.accent}>Return type</Divider>
+            <Field label="Primary return type" required>
+              <Sel value={s4.returnType} onChange={e=>setS4({...s4,returnType:e.target.value})}>
+                <option value="">Select return type</option>
+                <option value="cost">Cost savings</option>
+                <option value="efficiency">Efficiency / productivity</option>
+                <option value="revenue">Revenue generation</option>
+                <option value="risk">Risk reduction</option>
+                <option value="mix">Mixed (multiple types)</option>
+              </Sel>
+            </Field>
+            {s4.returnType==="cost" && (<>
+              <Divider accent={sc.accent}>Cost savings calculator</Divider>
+              <ThreeCol>
+                <Field label="FTEs redeployed"><Input type="number" placeholder="0" value={s4.costFTEs} onChange={e=>setS4({...s4,costFTEs:e.target.value})} /></Field>
+                <Field label="% time freed"><Input type="number" placeholder="0" value={s4.costTimePct} onChange={e=>setS4({...s4,costTimePct:e.target.value})} /></Field>
+                <Field label="Annual salary (avg)"><Input type="number" placeholder="$0" value={s4.costSalary} onChange={e=>setS4({...s4,costSalary:e.target.value})} /></Field>
+              </ThreeCol>
+              <TwoCol>
+                <Field label="Licenses eliminated"><Input type="number" placeholder="0" value={s4.costLicenses} onChange={e=>setS4({...s4,costLicenses:e.target.value})} /></Field>
+                <Field label="Cost per license / yr"><Input type="number" placeholder="$0" value={s4.costLicenseAmt} onChange={e=>setS4({...s4,costLicenseAmt:e.target.value})} /></Field>
+              </TwoCol>
+              <Field label="Infrastructure reduction (annual $)"><Input type="number" placeholder="$0" value={s4.costInfra} onChange={e=>setS4({...s4,costInfra:e.target.value})} /></Field>
+            </>)}
+            {s4.returnType==="efficiency" && (<>
+              <Divider accent={sc.accent}>Efficiency calculator</Divider>
+              <ThreeCol>
+                <Field label="Hours saved / week"><Input type="number" placeholder="0" value={s4.effHrs} onChange={e=>setS4({...s4,effHrs:e.target.value})} /></Field>
+                <Field label="Fully-loaded hourly rate"><Input type="number" placeholder="$0" value={s4.effRate} onChange={e=>setS4({...s4,effRate:e.target.value})} /></Field>
+                <ValBox label="Subtotal / yr" value={fmt(pf(s4.effHrs)*52*pf(s4.effRate))} />
+              </ThreeCol>
+              <ThreeCol>
+                <Field label="Errors reduced / month"><Input type="number" placeholder="0" value={s4.effErrors} onChange={e=>setS4({...s4,effErrors:e.target.value})} /></Field>
+                <Field label="Cost per error"><Input type="number" placeholder="$0" value={s4.effErrorCost} onChange={e=>setS4({...s4,effErrorCost:e.target.value})} /></Field>
+                <ValBox label="Subtotal / yr" value={fmt(pf(s4.effErrors)*12*pf(s4.effErrorCost))} />
+              </ThreeCol>
+              <ThreeCol>
+                <Field label="Queries deflected / month"><Input type="number" placeholder="0" value={s4.effQueries} onChange={e=>setS4({...s4,effQueries:e.target.value})} /></Field>
+                <Field label="Cost per query"><Input type="number" placeholder="$0" value={s4.effQueryCost} onChange={e=>setS4({...s4,effQueryCost:e.target.value})} /></Field>
+                <ValBox label="Subtotal / yr" value={fmt(pf(s4.effQueries)*12*pf(s4.effQueryCost))} />
+              </ThreeCol>
+            </>)}
+            {s4.returnType==="revenue" && (<>
+              <Divider accent={sc.accent}>Revenue calculator</Divider>
+              <TwoCol>
+                <Field label="New deals / year"><Input type="number" placeholder="0" value={s4.revDeals} onChange={e=>setS4({...s4,revDeals:e.target.value})} /></Field>
+                <Field label="Avg deal value"><Input type="number" placeholder="$0" value={s4.revDealValue} onChange={e=>setS4({...s4,revDealValue:e.target.value})} /></Field>
+              </TwoCol>
+              <TwoCol>
+                <Field label="Conversion lift %"><Input type="number" placeholder="0" value={s4.revLift} onChange={e=>setS4({...s4,revLift:e.target.value})} /></Field>
+                <Field label="Annual revenue base"><Input type="number" placeholder="$0" value={s4.revBase} onChange={e=>setS4({...s4,revBase:e.target.value})} /></Field>
+              </TwoCol>
+            </>)}
+            {s4.returnType==="risk" && (<>
+              <Divider accent={sc.accent}>Risk reduction calculator</Divider>
+              <TwoCol>
+                <Field label="Incident probability %"><Input type="number" placeholder="0" value={s4.riskProb} onChange={e=>setS4({...s4,riskProb:e.target.value})} /></Field>
+                <Field label="Avg incident cost"><Input type="number" placeholder="$0" value={s4.riskIncident} onChange={e=>setS4({...s4,riskIncident:e.target.value})} /></Field>
+              </TwoCol>
+              <TwoCol>
+                <Field label="Regulatory fine exposure"><Input type="number" placeholder="$0" value={s4.riskFine} onChange={e=>setS4({...s4,riskFine:e.target.value})} /></Field>
+                <Field label="Fine likelihood %"><Input type="number" placeholder="0" value={s4.riskFineLikely} onChange={e=>setS4({...s4,riskFineLikely:e.target.value})} /></Field>
+              </TwoCol>
+            </>)}
+            {s4.returnType==="mix" && (<>
+              <Divider accent={sc.accent}>Mixed return calculator</Divider>
+              <TwoCol>
+                <Field label="Cost savings $"><Input type="number" placeholder="$0" value={s4.mixCost} onChange={e=>setS4({...s4,mixCost:e.target.value})} /></Field>
+                <Field label="Efficiency gains $"><Input type="number" placeholder="$0" value={s4.mixEff} onChange={e=>setS4({...s4,mixEff:e.target.value})} /></Field>
+              </TwoCol>
+              <TwoCol>
+                <Field label="Revenue generated $"><Input type="number" placeholder="$0" value={s4.mixRev} onChange={e=>setS4({...s4,mixRev:e.target.value})} /></Field>
+                <Field label="Risk value avoided $"><Input type="number" placeholder="$0" value={s4.mixRisk} onChange={e=>setS4({...s4,mixRisk:e.target.value})} /></Field>
+              </TwoCol>
+            </>)}
+            {s4.returnType && (<>
+              <div style={{borderTop:`1px solid ${C.mistDark}`,margin:"20px 0"}} />
+              <TwoCol><ValBox label="Projected annual value" value={fmt(av)} /><ValBox label="Payback period" value={payback ? payback+" months" : "—"} /></TwoCol>
+            </>)}
+          </>)}
+
+          {step===5 && (<>
+            <Divider accent={sc.accent}>KPIs — quantitative targets</Divider>
+            <Field label="KPI categories" required><TagGroup options={KPI_CATS} selected={s5.kpiCats} onChange={v=>setS5({...s5,kpiCats:v})} accent={sc.accent} /></Field>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 120px 110px 110px 30px",gap:8,fontSize:11,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:"0.05em",marginTop:16,marginBottom:8}}>
+              <span>KPI</span><span>Unit</span><span>Baseline</span><span>Target</span><span></span>
+            </div>
+            {s5.kpis.map((kpi,i)=><KpiRow key={i} kpi={kpi} index={i} onChange={updKpi} onRemove={rmKpi} />)}
+            <button onClick={addKpi} style={{fontSize:13,color:sc.accent,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginTop:4,fontWeight:600}}>+ Add another KPI</button>
+            <Field label="How will KPIs be measured?" required hint="Data source, who pulls it, and how often" style={{marginTop:20}}>
+              <TA rows={2} placeholder="e.g. Pulled from Jira weekly by the PM; adoption tracked via Azure AD login analytics" value={s5.measureMethod} onChange={e=>setS5({...s5,measureMethod:e.target.value})} />
+            </Field>
+            <Field label="Benefits realization owner" required hint="This person will receive automated task assignments at Day 30, 60, and 90 post-launch.">
+              <Input type="text" placeholder="Full name — accountable for post-launch KPI reviews" value={s5.realizationOwner} onChange={e=>setS5({...s5,realizationOwner:e.target.value})} />
+            </Field>
+            <Divider accent={sc.accent}>Success metrics — qualitative outcomes</Divider>
+            <Field label="What does success look like at 90 days?">
+              <TA rows={3} placeholder="Describe the broader outcome — e.g. Analysts spend less time on reconciliation and more time on higher-value research" value={s5.success90} onChange={e=>setS5({...s5,success90:e.target.value})} />
+            </Field>
+            <Field label="What does success look like at 12 months?">
+              <TA rows={3} placeholder="e.g. The tool is embedded in daily workflow, shadow workarounds eliminated, team actively requesting new features" value={s5.success12mo} onChange={e=>setS5({...s5,success12mo:e.target.value})} />
+            </Field>
+            <Field label="How will user experience be assessed?"><TagGroup options={UX_METHODS} selected={s5.uxMethods} onChange={v=>setS5({...s5,uxMethods:v})} accent={sc.accent} /></Field>
+          </>)}
+
+          {step===6 && (<>
+            <Field label="Data classification" required>
+              <Sel value={s6.dataClass} onChange={e=>setS6({...s6,dataClass:e.target.value})}>
+                <option value="">Select classification</option>
+                {["Public","Internal","Confidential","Restricted — PII","Restricted — client data","Restricted — regulatory"].map(o=><option key={o}>{o}</option>)}
+              </Sel>
+            </Field>
+            <Field label="Does this use or expose client data?" required>
+              <RadioGroup name="clientdata" value={s6.clientData} onChange={v=>setS6({...s6,clientData:v})} accent={sc.accent} options={[
+                {value:"yes",label:"Yes",sub:"Triggers data governance and privacy review"},
+                {value:"no",label:"No"},
+                {value:"unsure",label:"Unsure — needs assessment"},
+              ]} />
+            </Field>
+            <Field label="Regulatory exposure"><TagGroup options={REGS} selected={s6.regs} onChange={v=>setS6({...s6,regs:v})} accent={sc.accent} /></Field>
+            <Field label="Model risk classification">
+              <Sel value={s6.modelRisk} onChange={e=>setS6({...s6,modelRisk:e.target.value})}>
+                <option value="">Select risk level</option>
+                <option>Low — rules-based, no autonomous decisions</option>
+                <option>Medium — AI-assisted, human in the loop</option>
+                <option>High — AI makes or heavily influences decisions</option>
+                <option>Critical — investment or regulatory decisions</option>
+              </Sel>
+            </Field>
+            <Field label="Does this initiative require legal review?">
+              <RadioGroup name="legalneeded" value={s6.legalNeeded} onChange={v=>setS6({...s6,legalNeeded:v})} accent={sc.accent} options={[
+                {value:"yes",label:"Yes",sub:"e.g. vendor contracts, IP, data agreements, regulatory obligations"},
+                {value:"no",label:"No — internal tooling, no external contracts or regulatory scope"},
+                {value:"unsure",label:"Unsure — flag for AI CoE to assess"},
+              ]} />
+            </Field>
+            {s6.legalNeeded==="yes" && (
+              <div style={{padding:"16px 20px",background:"#f5f5f5",border:"1px solid #d8d8d8",borderRadius:12,marginTop:4}}>
+                <Field label="Legal review status">
+                  <Sel value={s6.legalStatus} onChange={e=>setS6({...s6,legalStatus:e.target.value})}>
+                    <option value="">Select status</option>
+                    <option>Not yet started</option><option>In progress</option><option>Approved</option><option>Approved with conditions</option>
+                  </Sel>
+                </Field>
+                <Field label="Legal areas involved"><TagGroup options={LEGAL_AREAS} selected={s6.legalAreas} onChange={v=>setS6({...s6,legalAreas:v})} accent={C.blueDeep} /></Field>
+              </div>
+            )}
+            <Field label="Known risks or concerns" hint="Data quality issues, model limitations, vendor concerns, compliance questions.">
+              <TA rows={3} placeholder="e.g. Model may hallucinate on low-frequency trade types — will require human review gate" value={s6.risks} onChange={e=>setS6({...s6,risks:e.target.value})} />
+            </Field>
+          </>)}
+
+          {step===7 && (<>
+            <Divider accent={sc.accent}>Core team</Divider>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 90px 30px",gap:8,fontSize:11,fontWeight:700,color:C.textLight,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>
+              <span>Role</span><span>Team / name</span><span>% allocated</span><span></span>
+            </div>
+            {s7.team.map((row,i)=><TeamRow key={i} row={row} index={i} onChange={updTeam} onRemove={rmTeam} />)}
+            <button onClick={addTeam} style={{fontSize:13,color:sc.accent,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginTop:4,fontWeight:600}}>+ Add team member</button>
+            <div style={{borderTop:`1px solid ${C.mistDark}`,margin:"20px 0"}} />
+            <Field label="Resource constraints or blockers">
+              <TA rows={3} placeholder="Known capacity issues, hiring gaps, or competing priorities that could affect delivery" value={s7.constraints} onChange={e=>setS7({...s7,constraints:e.target.value})} />
+            </Field>
+            <Field label="Additional notes for the AI CoE">
+              <TA rows={3} placeholder="Anything else the review committee should know about this submission" value={s7.notes} onChange={e=>setS7({...s7,notes:e.target.value})} />
+            </Field>
+            <div style={{marginTop:24,padding:"18px 22px",background:"#f5f5f5",border:"1px solid #d8d8d8",borderRadius:12}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#555555",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>Submission summary</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 24px",fontSize:13}}>
+                <div><span style={{color:C.textLight}}>Initiative: </span><span style={{color:C.navy,fontWeight:600}}>{s1.name||"—"}</span></div>
+                <div><span style={{color:C.textLight}}>Use case ID: </span><span style={{fontFamily:"monospace",color:C.navy,fontWeight:700}}>{useCaseId}</span></div>
+                <div><span style={{color:C.textLight}}>Business line: </span><span style={{color:C.navy}}>{s1.businessLine||"—"}</span></div>
+                <div><span style={{color:C.textLight}}>Vendor: </span><span style={{color:C.navy}}>{s1.vendor||"—"}</span></div>
+                <div><span style={{color:C.textLight}}>Total cost: </span><span style={{color:C.navy}}>{s4.totalCost?"$"+pf(s4.totalCost).toLocaleString():"—"}</span></div>
+                <div><span style={{color:C.textLight}}>Annual value: </span><span style={{color:"#1a1a1a",fontWeight:av>0?700:400}}>{fmt(av)}</span></div>
+              </div>
+            </div>
+          </>)}
+
+        </div>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:20 }}>
+          <button onClick={()=>setStep(Math.max(1,step-1))} disabled={step===1} style={{
+            padding:"10px 24px", border:`1.5px solid ${C.border}`, borderRadius:10,
+            background:C.white, color:step===1?C.textLight:C.navy,
+            fontSize:14, fontWeight:700, cursor:step===1?"default":"pointer", fontFamily:"inherit",
+          }}>← Back</button>
+
+          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+            {STEPS.map((_,idx)=>(
+              <div key={idx} style={{width:idx+1===step?20:6,height:6,borderRadius:99,background:idx+1===step?sc.accent:idx+1<step?sc.mid:C.mistDark,transition:"all 0.3s",cursor:"pointer"}} onClick={()=>setStep(idx+1)} />
+            ))}
+          </div>
+
+          {step<7
+            ? <button onClick={()=>setStep(Math.min(7,step+1))} style={{padding:"10px 28px",border:"none",borderRadius:10,background:C.navy,color:C.white,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Continue →</button>
+            : <button onClick={()=>setSubmitted(true)} style={{padding:"10px 28px",border:"none",borderRadius:10,background:"#1a1a1a",color:"#ffffff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Submit for review →</button>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(ARIAIntakeForm));
+  </script>
+</body>
+</html>
