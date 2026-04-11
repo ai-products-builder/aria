@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ARIA — AI Initiative Intake</title>
-  <meta name="description" content="ARIA AI Resource & Investment Aggregator — Submit a new AI initiative for AI CoE review." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -21,44 +20,34 @@
   <script type="text/babel">
 const { useState } = React;
 
+const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
+
+async function saveToSupabase(data) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/aria_usecases`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Prefer": "return=representation",
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+  return res.json();
+}
+
 const C = {
-  navy: "#1a1a1a",
-  blue: "#f0f0f0",
-  blueMid: "#d0d0d0",
-  blueDeep: "#444444",
-  sage: "#f0f0f0",
-  sageMid: "#d0d0d0",
-  sageDeep: "#444444",
-  sky: "#f0f0f0",
-  skyMid: "#d0d0d0",
-  skyDeep: "#444444",
-  blush: "#f0f0f0",
-  blushMid: "#d0d0d0",
-  blushDeep: "#444444",
-  peach: "#f0f0f0",
-  peachMid: "#d0d0d0",
-  peachDeep: "#444444",
-  mist: "#f2f2f2",
-  mistDark: "#e0e0e0",
-  border: "#d4d4d4",
-  text: "#1a1a1a",
-  textMid: "#555555",
-  textLight: "#999999",
-  white: "#ffffff",
-  warn: "#fff8e8",
-  warnBorder: "#e0c060",
-  warnText: "#7a4d00",
+  navy: "#1a1a1a", mist: "#f2f2f2", mistDark: "#e0e0e0", border: "#d4d4d4",
+  text: "#1a1a1a", textMid: "#555555", textLight: "#999999", white: "#ffffff",
+  warn: "#fff8e8", warnBorder: "#e0c060", warnText: "#7a4d00",
 };
 
-const STEP_COLORS = [
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-  { bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" },
-];
+const STEP_COLORS = Array(7).fill({ bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" });
 
 const VENDORS = [
   { group: "Anthropic / Claude", options: ["Claude (Anthropic)"] },
@@ -97,7 +86,7 @@ function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
 function pf(v) { return parseFloat(v) || 0; }
 
 function TagGroup({ options, selected, onChange, accent }) {
-  const ac = accent || C.blueDeep;
+  const ac = accent || "#444";
   const toggle = opt => onChange(selected.includes(opt) ? selected.filter(x=>x!==opt) : [...selected, opt]);
   return (
     <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginTop:6 }}>
@@ -136,15 +125,15 @@ function ThreeCol({ children }) { return <div style={{ display:"grid", gridTempl
 function Divider({ children, accent }) {
   return (
     <div style={{ display:"flex", alignItems:"center", gap:10, margin:"24px 0 16px" }}>
-      <div style={{ width:4, height:16, borderRadius:99, background: accent||C.blueDeep, flexShrink:0 }} />
-      <span style={{ fontSize:11, fontWeight:700, color: accent||C.blueDeep, textTransform:"uppercase", letterSpacing:"0.08em", whiteSpace:"nowrap" }}>{children}</span>
+      <div style={{ width:4, height:16, borderRadius:99, background:accent||"#444", flexShrink:0 }} />
+      <span style={{ fontSize:11, fontWeight:700, color:accent||"#444", textTransform:"uppercase", letterSpacing:"0.08em", whiteSpace:"nowrap" }}>{children}</span>
       <div style={{ flex:1, height:1, background:C.mistDark }} />
     </div>
   );
 }
 
 function RadioGroup({ name, options, value, onChange, accent }) {
-  const ac = accent || C.blueDeep;
+  const ac = accent || "#444";
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:8, marginTop:6 }}>
       {options.map(opt => (
@@ -207,25 +196,27 @@ function ARIAIntakeForm() {
   const [step, setStep] = useState(1);
   const [useCaseId] = useState(genId);
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
-  const [s1, setS1] = useState({ name:"AI-Powered Trade Reconciliation Assistant", businessLine:"Operations", team:"Trade Operations", sponsor:"Sarah Chen, Chief Operating Officer", owner:"Marcus Obi, VP Trade Operations", startDate:"2026-05-01", goLiveDate:"2026-10-15", vendor:"Claude (Anthropic)", otherVendor:"" });
-  const [s2, setS2] = useState({ problem:"Trade operations analysts spend 3–4 hours per day manually reconciling discrepancies between our order management system and custodian records. The process is entirely manual — analysts pull data from 4 separate systems, paste into Excel, and cross-reference line by line. Error rates average 2.3% per month, each requiring costly remediation averaging $4,200 per incident.", adopters:"62 trade operations analysts across 3 regional teams (Americas, EMEA, APAC). All 62 are primary users from day one. Secondary users include 12 portfolio managers who consume reconciliation reports.", whyNow:"Trade volume has grown 34% YoY and we are onboarding two new custodians in Q3 2026. Manual capacity cannot scale. The SEC's updated Rule 17a-3 record-keeping requirements effective January 2027 also increase the compliance burden on current manual processes.", inaction:"Without automation, we will need to hire 8 additional analysts at $120K fully-loaded each ($960K/yr) to keep pace with volume growth. Continued error rates expose us to regulatory scrutiny and potential client reporting failures.", problemTypes:["Automation","Data extraction","Monitoring & alerting"] });
-  const [s3, setS3] = useState({ pillars:["Operational excellence","Risk & compliance"], howAligned:"Automating reconciliation directly advances our operational excellence pillar by eliminating the highest-volume manual process in Trade Operations. It also supports risk & compliance by reducing human error in regulatory reporting and positioning us ahead of the January 2027 SEC Rule 17a-3 changes.", roadmap:"yes", dependencies:"Depends on the Data Fabric initiative (ARIA-2026-0018) for unified data access layer. Overlaps with the Custodian API integration project (IT-2025-114) — coordination required on data schema." });
-  const [s4, setS4] = useState({ totalCost:"485000", confidence:"Budgetary estimate (±25%)", buildCost:"280000", licenseCost:"95000", runCost:"110000", returnType:"efficiency", costFTEs:"", costTimePct:"", costSalary:"", costLicenses:"", costLicenseAmt:"", costInfra:"", effHrs:"186", effRate:"72", effErrors:"28", effErrorCost:"4200", effQueries:"", effQueryCost:"", revDeals:"", revDealValue:"", revLift:"", revBase:"", riskProb:"", riskIncident:"", riskFine:"", riskFineLikely:"", mixCost:"", mixEff:"", mixRev:"", mixRisk:"" });
-  const [s5, setS5] = useState({ kpiCats:["Time savings","Error reduction","Adoption rate"], kpis:[{name:"Hours saved per user per week",baseline:"3.5",target:"0.5"},{name:"Error rate in processed records",baseline:"2.3",target:"0.3"},{name:"User adoption rate",baseline:"0",target:"90"}], measureMethod:"Hours saved tracked via analyst time-log surveys (bi-weekly). Error rate pulled from reconciliation audit log in OMS — automated report generated weekly by Data Engineering. Adoption rate via Azure AD login analytics dashboard.", realizationOwner:"Priya Nair, Senior Manager Trade Operations", success90:"All 62 analysts are actively using the tool daily. Manual Excel reconciliation has been eliminated for standard trade types. Analysts report spending less than 30 minutes per day on reconciliation vs. the current 3–4 hours.", success12mo:"The tool handles 95%+ of reconciliation volume autonomously. Analysts are redeployed to exception management and counterparty relationship work. The team proactively requests expansion to cover new custodians and asset classes.", uxMethods:["User interviews","CSAT survey","Usage analytics"] });
-  const [s6, setS6] = useState({ dataClass:"Confidential", clientData:"no", regs:["SEC","FINRA","SOX"], modelRisk:"Medium — AI-assisted, human in the loop", legalNeeded:"yes", legalStatus:"In progress", legalAreas:["Vendor / third-party contracts","Data licensing"], risks:"1. Model may misclassify edge-case trade types (e.g. multi-leg derivatives, cross-currency swaps) — mitigation: human review gate for any trade flagged as low-confidence.\n2. Data quality: OMS feed has known latency issues during peak settlement windows — mitigation: reconciliation runs scheduled for off-peak hours.\n3. Claude API dependency: if Anthropic API is unavailable, fallback to manual queue — runbook required." });
-  const [s7, setS7] = useState({ team:[{role:"Product manager",name:"Marcus Obi",pct:"50"},{role:"ML engineer",name:"Data & Technology — TBD hire",pct:"100"},{role:"Software engineer",name:"James Lim, Platform Engineering",pct:"75"},{role:"Business analyst",name:"Anika Sharma, Trade Ops",pct:"50"},{role:"Risk & compliance",name:"David Torres, Compliance",pct:"25"}], constraints:"ML engineer role is currently open — requisition submitted, target hire date May 2026. If hire is delayed beyond June, go-live date will slip by 6–8 weeks. James Lim is also allocated 25% to the Custodian API project — coordination with IT-2025-114 PM required.", notes:"This submission has been pre-reviewed informally with the AI CoE in March 2026. Sarah Chen has committed budget subject to formal AI CoE approval. Recommend fast-tracking to Assessment stage given regulatory timeline pressure from SEC Rule 17a-3." });
+  const [s1, setS1] = useState({ name:"", businessLine:"", team:"", sponsor:"", owner:"", startDate:today(), goLiveDate:sixMonths(), vendor:"", otherVendor:"" });
+  const [s2, setS2] = useState({ problem:"", adopters:"", whyNow:"", inaction:"", problemTypes:[] });
+  const [s3, setS3] = useState({ pillars:[], howAligned:"", roadmap:"", dependencies:"" });
+  const [s4, setS4] = useState({ totalCost:"", confidence:"Rough order of magnitude (±50%)", buildCost:"", licenseCost:"", runCost:"", returnType:"", costFTEs:"", costTimePct:"", costSalary:"", costLicenses:"", costLicenseAmt:"", costInfra:"", effHrs:"", effRate:"", effErrors:"", effErrorCost:"", effQueries:"", effQueryCost:"", revDeals:"", revDealValue:"", revLift:"", revBase:"", riskProb:"", riskIncident:"", riskFine:"", riskFineLikely:"", mixCost:"", mixEff:"", mixRev:"", mixRisk:"" });
+  const [s5, setS5] = useState({ kpiCats:[], kpis:[{name:"",baseline:"",target:""}], measureMethod:"", realizationOwner:"", success90:"", success12mo:"", uxMethods:[] });
+  const [s6, setS6] = useState({ dataClass:"", clientData:"", regs:[], modelRisk:"", legalNeeded:"No", legalStatus:"", legalAreas:[], risks:"" });
+  const [s7, setS7] = useState({ team:[{role:"",name:"",pct:""}], constraints:"", notes:"" });
 
   const shadowAI = s1.vendor && !REGISTRY.includes(s1.vendor);
   const sc = STEP_COLORS[step-1];
 
   function calcAV() {
     const rt = s4.returnType;
-    if(rt==="cost") return pf(s4.costFTEs)*(pf(s4.costTimePct)/100)*pf(s4.costSalary)+pf(s4.costLicenses)*pf(s4.costLicenseAmt)+pf(s4.costInfra);
-    if(rt==="efficiency") return pf(s4.effHrs)*52*pf(s4.effRate)+pf(s4.effErrors)*12*pf(s4.effErrorCost)+pf(s4.effQueries)*12*pf(s4.effQueryCost);
-    if(rt==="revenue") return pf(s4.revDeals)*pf(s4.revDealValue)+(pf(s4.revLift)/100)*pf(s4.revBase);
-    if(rt==="risk") return (pf(s4.riskProb)/100)*pf(s4.riskIncident)+pf(s4.riskFine)*(pf(s4.riskFineLikely)/100);
-    if(rt==="mix") return pf(s4.mixCost)+pf(s4.mixEff)+pf(s4.mixRev)+pf(s4.mixRisk);
+    if(rt==="Cost savings") return pf(s4.costFTEs)*(pf(s4.costTimePct)/100)*pf(s4.costSalary)+pf(s4.costLicenses)*pf(s4.costLicenseAmt)+pf(s4.costInfra);
+    if(rt==="Efficiency / productivity") return pf(s4.effHrs)*52*pf(s4.effRate)+pf(s4.effErrors)*12*pf(s4.effErrorCost)+pf(s4.effQueries)*12*pf(s4.effQueryCost);
+    if(rt==="Revenue generation") return pf(s4.revDeals)*pf(s4.revDealValue)+(pf(s4.revLift)/100)*pf(s4.revBase);
+    if(rt==="Risk reduction") return (pf(s4.riskProb)/100)*pf(s4.riskIncident)+pf(s4.riskFine)*(pf(s4.riskFineLikely)/100);
+    if(rt==="Mixed (multiple types)") return pf(s4.mixCost)+pf(s4.mixEff)+pf(s4.mixRev)+pf(s4.mixRisk);
     return 0;
   }
   const av = calcAV();
@@ -239,55 +230,137 @@ function ARIAIntakeForm() {
   function addTeam(){ setS7({...s7,team:[...s7.team,{role:"",name:"",pct:""}]}); }
   function rmTeam(i){ setS7({...s7,team:s7.team.filter((_,idx)=>idx!==i)}); }
 
+  async function handleSubmit() {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const payload = {
+        use_case_id: useCaseId,
+        stage: "Ideation",
+        submitted_date: today(),
+        name: s1.name,
+        business_line: s1.businessLine,
+        team: s1.team,
+        sponsor: s1.sponsor,
+        owner: s1.owner,
+        start_date: s1.startDate,
+        go_live_date: s1.goLiveDate,
+        vendor: s1.vendor,
+        other_vendor: s1.otherVendor || null,
+        problem: s2.problem,
+        adopters: s2.adopters,
+        why_now: s2.whyNow,
+        inaction: s2.inaction || null,
+        problem_types: s2.problemTypes,
+        pillars: s3.pillars,
+        how_aligned: s3.howAligned,
+        roadmap: s3.roadmap,
+        dependencies: s3.dependencies || null,
+        total_cost: pf(s4.totalCost),
+        cost_confidence: s4.confidence,
+        build_cost: pf(s4.buildCost) || null,
+        license_cost: pf(s4.licenseCost) || null,
+        run_cost: pf(s4.runCost) || null,
+        return_type: s4.returnType,
+        cost_ftes: pf(s4.costFTEs) || null,
+        cost_time_pct: pf(s4.costTimePct) || null,
+        cost_salary: pf(s4.costSalary) || null,
+        cost_licenses: pf(s4.costLicenses) || null,
+        cost_license_amt: pf(s4.costLicenseAmt) || null,
+        cost_infra: pf(s4.costInfra) || null,
+        eff_hrs: pf(s4.effHrs) || null,
+        eff_rate: pf(s4.effRate) || null,
+        eff_errors: pf(s4.effErrors) || null,
+        eff_error_cost: pf(s4.effErrorCost) || null,
+        eff_queries: pf(s4.effQueries) || null,
+        eff_query_cost: pf(s4.effQueryCost) || null,
+        rev_deals: pf(s4.revDeals) || null,
+        rev_deal_value: pf(s4.revDealValue) || null,
+        rev_lift: pf(s4.revLift) || null,
+        rev_base: pf(s4.revBase) || null,
+        risk_prob: pf(s4.riskProb) || null,
+        risk_incident: pf(s4.riskIncident) || null,
+        risk_fine: pf(s4.riskFine) || null,
+        risk_fine_likely: pf(s4.riskFineLikely) || null,
+        mix_cost: pf(s4.mixCost) || null,
+        mix_eff: pf(s4.mixEff) || null,
+        mix_rev: pf(s4.mixRev) || null,
+        mix_risk: pf(s4.mixRisk) || null,
+        annual_value: av || null,
+        payback_months: payback || null,
+        kpi_cats: s5.kpiCats,
+        kpis: s5.kpis,
+        measure_method: s5.measureMethod,
+        realization_owner: s5.realizationOwner,
+        success_90: s5.success90 || null,
+        success_12mo: s5.success12mo || null,
+        ux_methods: s5.uxMethods,
+        data_class: s6.dataClass,
+        client_data: s6.clientData,
+        regs: s6.regs,
+        model_risk: s6.modelRisk || null,
+        legal_needed: s6.legalNeeded,
+        legal_status: s6.legalStatus || null,
+        legal_areas: s6.legalAreas,
+        risks: s6.risks || null,
+        team_members: s7.team,
+        constraints: s7.constraints || null,
+        notes: s7.notes || null,
+      };
+      await saveToSupabase(payload);
+      setSubmitted(true);
+    } catch(e) {
+      setSaveError("Submission failed: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if(submitted) return (
-    <div style={{ background:"#f2f2f2", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"'DM Sans','Nunito',system-ui,sans-serif" }}>
+    <div style={{ background:"#f2f2f2", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"'DM Sans',system-ui,sans-serif" }}>
       <div style={{ background:C.white, borderRadius:20, padding:"48px 40px", maxWidth:480, width:"100%", textAlign:"center" }}>
-        <div style={{ width:64, height:64, borderRadius:"50%", background:"#ebebeb", border:"2px solid #cccccc", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:26, color:"#333333" }}>✓</div>
+        <div style={{ width:64, height:64, borderRadius:"50%", background:"#ebebeb", border:"2px solid #cccccc", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:26, color:"#333" }}>✓</div>
         <div style={{ fontSize:24, fontWeight:800, color:C.navy, marginBottom:8 }}>Submission received</div>
         <div style={{ fontSize:14, color:C.textMid, lineHeight:1.7, marginBottom:28 }}>Your AI initiative has been submitted to the AI CoE for review. You'll receive a notification within 10 business days.</div>
         <div style={{ background:"#ebebeb", border:"1px solid #cccccc", borderRadius:12, padding:"14px 24px", marginBottom:32, display:"inline-block" }}>
-          <div style={{ fontSize:11, color:"#555555", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Use case ID</div>
+          <div style={{ fontSize:11, color:"#555", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Use case ID</div>
           <div style={{ fontSize:20, fontWeight:800, fontFamily:"monospace", color:C.navy }}>{useCaseId}</div>
         </div>
-        <div><button onClick={()=>{setSubmitted(false);setStep(1);}} style={{ padding:"11px 28px", background:C.navy, color:C.white, border:"none", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Submit another initiative</button></div>
+        <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
+          <button onClick={()=>{setSubmitted(false);setStep(1);}} style={{ padding:"11px 28px", background:C.navy, color:C.white, border:"none", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Submit another</button>
+          <a href="aria-repository.html" style={{ padding:"11px 28px", background:"#fff", color:C.navy, border:"1.5px solid #ccc", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit", textDecoration:"none" }}>View repository →</a>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div style={{ background:C.mist, minHeight:"100vh", fontFamily:"'DM Sans','Nunito',system-ui,sans-serif" }}>
-
+    <div style={{ background:C.mist, minHeight:"100vh", fontFamily:"'DM Sans',system-ui,sans-serif" }}>
       <div style={{ background:"#1a1a1a", padding:"0 32px" }}>
         <div style={{ maxWidth:880, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:54 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:28, height:28, borderRadius:8, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:C.navy }}>A</div>
-            <span style={{ fontSize:14, fontWeight:700, color:C.white, letterSpacing:"0.05em" }}>ARIA</span>
+            <div style={{ width:28, height:28, borderRadius:8, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#fff" }}>A</div>
+            <span style={{ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }}>ARIA</span>
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }}>·</span>
             <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>New AI initiative intake</span>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.12)", borderRadius:8, padding:"5px 12px" }}>
-            <span style={{ fontSize:10, color:"rgba(255,255,255,0.6)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em" }}>ID</span>
-            <span style={{ fontSize:12, fontFamily:"monospace", fontWeight:700, color:"#ffffff" }}>{useCaseId}</span>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <a href="aria-repository.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>View repository →</a>
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.12)", borderRadius:8, padding:"5px 12px" }}>
+              <span style={{ fontSize:10, color:"rgba(255,255,255,0.6)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em" }}>ID</span>
+              <span style={{ fontSize:12, fontFamily:"monospace", fontWeight:700, color:"#fff" }}>{useCaseId}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ background:sc.bg, borderBottom:`1px solid ${sc.mid}`, padding:"0 32px", transition:"background 0.3s" }}>
+      <div style={{ background:sc.bg, borderBottom:`1px solid ${sc.mid}`, padding:"0 32px" }}>
         <div style={{ maxWidth:880, margin:"0 auto", display:"flex", overflowX:"auto" }}>
           {STEPS.map((label,idx)=>{
             const sn=idx+1, done=sn<step, active=sn===step;
             return (
-              <button key={sn} onClick={()=>setStep(sn)} style={{
-                display:"flex", alignItems:"center", gap:8, padding:"14px 16px",
-                background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", flexShrink:0,
-                borderBottom: active ? `3px solid ${sc.accent}` : "3px solid transparent",
-              }}>
-                <div style={{
-                  width:22, height:22, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:11, fontWeight:700, flexShrink:0,
-                  background: done ? sc.accent : active ? C.navy : sc.mid,
-                  color: done||active ? C.white : C.textMid,
-                }}>{done ? "✓" : sn}</div>
+              <button key={sn} onClick={()=>setStep(sn)} style={{ display:"flex", alignItems:"center", gap:8, padding:"14px 16px", background:"transparent", border:"none", cursor:"pointer", fontFamily:"inherit", flexShrink:0, borderBottom:active?`3px solid ${sc.accent}`:"3px solid transparent" }}>
+                <div style={{ width:22, height:22, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, flexShrink:0, background:done?sc.accent:active?C.navy:sc.mid, color:done||active?C.white:C.textMid }}>{done?"✓":sn}</div>
                 <span style={{ fontSize:12, fontWeight:active?700:500, color:active?C.navy:C.textLight, whiteSpace:"nowrap" }}>{label}</span>
               </button>
             );
@@ -305,13 +378,11 @@ function ARIAIntakeForm() {
 
           {step===1 && (<>
             <div style={{ display:"inline-flex", alignItems:"center", gap:10, padding:"7px 14px", background:"#ebebeb", border:"1px solid #cccccc", borderRadius:10, marginBottom:24 }}>
-              <span style={{ fontSize:11, fontWeight:700, color:"#555555", textTransform:"uppercase", letterSpacing:"0.07em" }}>Use case ID</span>
+              <span style={{ fontSize:11, fontWeight:700, color:"#555", textTransform:"uppercase", letterSpacing:"0.07em" }}>Use case ID</span>
               <span style={{ fontSize:13, fontWeight:800, fontFamily:"monospace", color:C.navy }}>{useCaseId}</span>
-              <span style={{ fontSize:11, padding:"2px 8px", background:"#d0d0d0", borderRadius:99, color:"#333333", fontWeight:600 }}>Auto-assigned</span>
+              <span style={{ fontSize:11, padding:"2px 8px", background:"#d0d0d0", borderRadius:99, color:"#333", fontWeight:600 }}>Auto-assigned</span>
             </div>
-            <Field label="AI initiative name" required>
-              <Input type="text" placeholder="e.g. Automated trade reconciliation assistant" value={s1.name} onChange={e=>setS1({...s1,name:e.target.value})} />
-            </Field>
+            <Field label="AI initiative name" required><Input type="text" placeholder="e.g. Automated trade reconciliation assistant" value={s1.name} onChange={e=>setS1({...s1,name:e.target.value})} /></Field>
             <TwoCol>
               <Field label="Business line" required>
                 <Sel value={s1.businessLine} onChange={e=>setS1({...s1,businessLine:e.target.value})}>
@@ -345,44 +416,30 @@ function ARIAIntakeForm() {
           </>)}
 
           {step===2 && (<>
-            <Field label="What problem are you solving?" required>
-              <TA rows={4} placeholder="Describe the current state and the pain point. Be specific — avoid 'improve efficiency' without context." value={s2.problem} onChange={e=>setS2({...s2,problem:e.target.value})} />
-            </Field>
-            <Field label="How many people will adopt this?" required hint="Include team name, role, and rough headcount.">
-              <TA rows={3} placeholder="e.g. 45 trade operations analysts across 3 teams — primary users from day one" value={s2.adopters} onChange={e=>setS2({...s2,adopters:e.target.value})} />
-            </Field>
-            <Field label="Why now?" required>
-              <TA rows={3} placeholder="What has changed — volume, regulation, capacity, competitive pressure — that makes this the right time?" value={s2.whyNow} onChange={e=>setS2({...s2,whyNow:e.target.value})} />
-            </Field>
-            <Field label="What happens if we don't act?">
-              <TA rows={3} placeholder="Describe the cost of inaction — risk exposure, manual burden, missed opportunity" value={s2.inaction} onChange={e=>setS2({...s2,inaction:e.target.value})} />
-            </Field>
+            <Field label="What problem are you solving?" required><TA rows={4} placeholder="Describe the current state and the pain point." value={s2.problem} onChange={e=>setS2({...s2,problem:e.target.value})} /></Field>
+            <Field label="How many people will adopt this?" required hint="Include team name, role, and rough headcount."><TA rows={3} placeholder="e.g. 45 trade operations analysts across 3 teams" value={s2.adopters} onChange={e=>setS2({...s2,adopters:e.target.value})} /></Field>
+            <Field label="Why now?" required><TA rows={3} placeholder="What has changed that makes this the right time?" value={s2.whyNow} onChange={e=>setS2({...s2,whyNow:e.target.value})} /></Field>
+            <Field label="What happens if we don't act?"><TA rows={3} placeholder="Describe the cost of inaction" value={s2.inaction} onChange={e=>setS2({...s2,inaction:e.target.value})} /></Field>
             <Field label="Problem type"><TagGroup options={PROBLEM_TYPES} selected={s2.problemTypes} onChange={v=>setS2({...s2,problemTypes:v})} accent={sc.accent} /></Field>
           </>)}
 
           {step===3 && (<>
-            <Field label="Which strategic pillar does this support?" required>
-              <TagGroup options={PILLARS} selected={s3.pillars} onChange={v=>setS3({...s3,pillars:v})} accent={sc.accent} />
-            </Field>
-            <Field label="How does this support the selected pillar?" required>
-              <TA rows={3} placeholder="Explain the direct connection — not just what the initiative does, but how it advances the strategic goal" value={s3.howAligned} onChange={e=>setS3({...s3,howAligned:e.target.value})} />
-            </Field>
+            <Field label="Which strategic pillar does this support?" required><TagGroup options={PILLARS} selected={s3.pillars} onChange={v=>setS3({...s3,pillars:v})} accent={sc.accent} /></Field>
+            <Field label="How does this support the selected pillar?" required><TA rows={3} placeholder="Explain the direct connection" value={s3.howAligned} onChange={e=>setS3({...s3,howAligned:e.target.value})} /></Field>
             <Field label="Is this initiative on the approved AI roadmap?">
               <RadioGroup name="roadmap" value={s3.roadmap} onChange={v=>setS3({...s3,roadmap:v})} accent={sc.accent} options={[
-                {value:"yes",label:"Yes — already on the AI CoE roadmap"},
-                {value:"no",label:"No — new submission not on current roadmap"},
-                {value:"partial",label:"Partial — related to a roadmap item but scope differs"},
+                {value:"Yes — already on the AI CoE roadmap",label:"Yes — already on the AI CoE roadmap"},
+                {value:"No — new submission not on current roadmap",label:"No — new submission not on current roadmap"},
+                {value:"Partial — related to a roadmap item but scope differs",label:"Partial — related to a roadmap item but scope differs"},
               ]} />
             </Field>
-            <Field label="Dependencies or related initiatives">
-              <TA rows={2} placeholder="List any other AI initiatives, systems, or data projects this depends on or overlaps with" value={s3.dependencies} onChange={e=>setS3({...s3,dependencies:e.target.value})} />
-            </Field>
+            <Field label="Dependencies or related initiatives"><TA rows={2} placeholder="List any dependencies or overlaps" value={s3.dependencies} onChange={e=>setS3({...s3,dependencies:e.target.value})} /></Field>
           </>)}
 
           {step===4 && (<>
             <Divider accent={sc.accent}>Total investment</Divider>
             <TwoCol>
-              <Field label="Total estimated cost" required hint="Include build, licensing, compute, and 12-month run-state. Minimum $10,000.">
+              <Field label="Total estimated cost" required hint="Minimum $10,000.">
                 <Input type="number" placeholder="Min $10,000" min={10000} step={1000} value={s4.totalCost} onChange={e=>setS4({...s4,totalCost:e.target.value})} />
                 {s4.totalCost && pf(s4.totalCost)<10000 && <div style={{fontSize:12,color:"#d04040",marginTop:4}}>Minimum investment is $10,000</div>}
               </Field>
@@ -403,14 +460,14 @@ function ARIAIntakeForm() {
             <Field label="Primary return type" required>
               <Sel value={s4.returnType} onChange={e=>setS4({...s4,returnType:e.target.value})}>
                 <option value="">Select return type</option>
-                <option value="cost">Cost savings</option>
-                <option value="efficiency">Efficiency / productivity</option>
-                <option value="revenue">Revenue generation</option>
-                <option value="risk">Risk reduction</option>
-                <option value="mix">Mixed (multiple types)</option>
+                <option>Cost savings</option>
+                <option>Efficiency / productivity</option>
+                <option>Revenue generation</option>
+                <option>Risk reduction</option>
+                <option>Mixed (multiple types)</option>
               </Sel>
             </Field>
-            {s4.returnType==="cost" && (<>
+            {s4.returnType==="Cost savings" && (<>
               <Divider accent={sc.accent}>Cost savings calculator</Divider>
               <ThreeCol>
                 <Field label="FTEs redeployed"><Input type="number" placeholder="0" value={s4.costFTEs} onChange={e=>setS4({...s4,costFTEs:e.target.value})} /></Field>
@@ -423,7 +480,7 @@ function ARIAIntakeForm() {
               </TwoCol>
               <Field label="Infrastructure reduction (annual $)"><Input type="number" placeholder="$0" value={s4.costInfra} onChange={e=>setS4({...s4,costInfra:e.target.value})} /></Field>
             </>)}
-            {s4.returnType==="efficiency" && (<>
+            {s4.returnType==="Efficiency / productivity" && (<>
               <Divider accent={sc.accent}>Efficiency calculator</Divider>
               <ThreeCol>
                 <Field label="Hours saved / week"><Input type="number" placeholder="0" value={s4.effHrs} onChange={e=>setS4({...s4,effHrs:e.target.value})} /></Field>
@@ -441,7 +498,7 @@ function ARIAIntakeForm() {
                 <ValBox label="Subtotal / yr" value={fmt(pf(s4.effQueries)*12*pf(s4.effQueryCost))} />
               </ThreeCol>
             </>)}
-            {s4.returnType==="revenue" && (<>
+            {s4.returnType==="Revenue generation" && (<>
               <Divider accent={sc.accent}>Revenue calculator</Divider>
               <TwoCol>
                 <Field label="New deals / year"><Input type="number" placeholder="0" value={s4.revDeals} onChange={e=>setS4({...s4,revDeals:e.target.value})} /></Field>
@@ -452,7 +509,7 @@ function ARIAIntakeForm() {
                 <Field label="Annual revenue base"><Input type="number" placeholder="$0" value={s4.revBase} onChange={e=>setS4({...s4,revBase:e.target.value})} /></Field>
               </TwoCol>
             </>)}
-            {s4.returnType==="risk" && (<>
+            {s4.returnType==="Risk reduction" && (<>
               <Divider accent={sc.accent}>Risk reduction calculator</Divider>
               <TwoCol>
                 <Field label="Incident probability %"><Input type="number" placeholder="0" value={s4.riskProb} onChange={e=>setS4({...s4,riskProb:e.target.value})} /></Field>
@@ -463,7 +520,7 @@ function ARIAIntakeForm() {
                 <Field label="Fine likelihood %"><Input type="number" placeholder="0" value={s4.riskFineLikely} onChange={e=>setS4({...s4,riskFineLikely:e.target.value})} /></Field>
               </TwoCol>
             </>)}
-            {s4.returnType==="mix" && (<>
+            {s4.returnType==="Mixed (multiple types)" && (<>
               <Divider accent={sc.accent}>Mixed return calculator</Divider>
               <TwoCol>
                 <Field label="Cost savings $"><Input type="number" placeholder="$0" value={s4.mixCost} onChange={e=>setS4({...s4,mixCost:e.target.value})} /></Field>
@@ -476,7 +533,7 @@ function ARIAIntakeForm() {
             </>)}
             {s4.returnType && (<>
               <div style={{borderTop:`1px solid ${C.mistDark}`,margin:"20px 0"}} />
-              <TwoCol><ValBox label="Projected annual value" value={fmt(av)} /><ValBox label="Payback period" value={payback ? payback+" months" : "—"} /></TwoCol>
+              <TwoCol><ValBox label="Projected annual value" value={fmt(av)} /><ValBox label="Payback period" value={payback?payback+" months":"—"} /></TwoCol>
             </>)}
           </>)}
 
@@ -489,18 +546,14 @@ function ARIAIntakeForm() {
             {s5.kpis.map((kpi,i)=><KpiRow key={i} kpi={kpi} index={i} onChange={updKpi} onRemove={rmKpi} />)}
             <button onClick={addKpi} style={{fontSize:13,color:sc.accent,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginTop:4,fontWeight:600}}>+ Add another KPI</button>
             <Field label="How will KPIs be measured?" required hint="Data source, who pulls it, and how often" style={{marginTop:20}}>
-              <TA rows={2} placeholder="e.g. Pulled from Jira weekly by the PM; adoption tracked via Azure AD login analytics" value={s5.measureMethod} onChange={e=>setS5({...s5,measureMethod:e.target.value})} />
+              <TA rows={2} placeholder="e.g. Pulled from Jira weekly by the PM" value={s5.measureMethod} onChange={e=>setS5({...s5,measureMethod:e.target.value})} />
             </Field>
-            <Field label="Benefits realization owner" required hint="This person will receive automated task assignments at Day 30, 60, and 90 post-launch.">
-              <Input type="text" placeholder="Full name — accountable for post-launch KPI reviews" value={s5.realizationOwner} onChange={e=>setS5({...s5,realizationOwner:e.target.value})} />
+            <Field label="Benefits realization owner" required hint="Receives automated Day 30/60/90 task assignments post-launch.">
+              <Input type="text" placeholder="Full name" value={s5.realizationOwner} onChange={e=>setS5({...s5,realizationOwner:e.target.value})} />
             </Field>
             <Divider accent={sc.accent}>Success metrics — qualitative outcomes</Divider>
-            <Field label="What does success look like at 90 days?">
-              <TA rows={3} placeholder="Describe the broader outcome — e.g. Analysts spend less time on reconciliation and more time on higher-value research" value={s5.success90} onChange={e=>setS5({...s5,success90:e.target.value})} />
-            </Field>
-            <Field label="What does success look like at 12 months?">
-              <TA rows={3} placeholder="e.g. The tool is embedded in daily workflow, shadow workarounds eliminated, team actively requesting new features" value={s5.success12mo} onChange={e=>setS5({...s5,success12mo:e.target.value})} />
-            </Field>
+            <Field label="What does success look like at 90 days?"><TA rows={3} placeholder="Describe the broader outcome" value={s5.success90} onChange={e=>setS5({...s5,success90:e.target.value})} /></Field>
+            <Field label="What does success look like at 12 months?"><TA rows={3} placeholder="Describe the 12-month vision" value={s5.success12mo} onChange={e=>setS5({...s5,success12mo:e.target.value})} /></Field>
             <Field label="How will user experience be assessed?"><TagGroup options={UX_METHODS} selected={s5.uxMethods} onChange={v=>setS5({...s5,uxMethods:v})} accent={sc.accent} /></Field>
           </>)}
 
@@ -513,9 +566,9 @@ function ARIAIntakeForm() {
             </Field>
             <Field label="Does this use or expose client data?" required>
               <RadioGroup name="clientdata" value={s6.clientData} onChange={v=>setS6({...s6,clientData:v})} accent={sc.accent} options={[
-                {value:"yes",label:"Yes",sub:"Triggers data governance and privacy review"},
-                {value:"no",label:"No"},
-                {value:"unsure",label:"Unsure — needs assessment"},
+                {value:"Yes",label:"Yes",sub:"Triggers data governance and privacy review"},
+                {value:"No",label:"No"},
+                {value:"Unsure — needs assessment",label:"Unsure — needs assessment"},
               ]} />
             </Field>
             <Field label="Regulatory exposure"><TagGroup options={REGS} selected={s6.regs} onChange={v=>setS6({...s6,regs:v})} accent={sc.accent} /></Field>
@@ -530,12 +583,12 @@ function ARIAIntakeForm() {
             </Field>
             <Field label="Does this initiative require legal review?">
               <RadioGroup name="legalneeded" value={s6.legalNeeded} onChange={v=>setS6({...s6,legalNeeded:v})} accent={sc.accent} options={[
-                {value:"yes",label:"Yes",sub:"e.g. vendor contracts, IP, data agreements, regulatory obligations"},
-                {value:"no",label:"No — internal tooling, no external contracts or regulatory scope"},
-                {value:"unsure",label:"Unsure — flag for AI CoE to assess"},
+                {value:"Yes",label:"Yes",sub:"e.g. vendor contracts, IP, data agreements, regulatory obligations"},
+                {value:"No",label:"No — internal tooling, no external contracts or regulatory scope"},
+                {value:"Unsure — flag for AI CoE to assess",label:"Unsure — flag for AI CoE to assess"},
               ]} />
             </Field>
-            {s6.legalNeeded==="yes" && (
+            {s6.legalNeeded==="Yes" && (
               <div style={{padding:"16px 20px",background:"#f5f5f5",border:"1px solid #d8d8d8",borderRadius:12,marginTop:4}}>
                 <Field label="Legal review status">
                   <Sel value={s6.legalStatus} onChange={e=>setS6({...s6,legalStatus:e.target.value})}>
@@ -543,11 +596,11 @@ function ARIAIntakeForm() {
                     <option>Not yet started</option><option>In progress</option><option>Approved</option><option>Approved with conditions</option>
                   </Sel>
                 </Field>
-                <Field label="Legal areas involved"><TagGroup options={LEGAL_AREAS} selected={s6.legalAreas} onChange={v=>setS6({...s6,legalAreas:v})} accent={C.blueDeep} /></Field>
+                <Field label="Legal areas involved"><TagGroup options={LEGAL_AREAS} selected={s6.legalAreas} onChange={v=>setS6({...s6,legalAreas:v})} accent="#444" /></Field>
               </div>
             )}
             <Field label="Known risks or concerns" hint="Data quality issues, model limitations, vendor concerns, compliance questions.">
-              <TA rows={3} placeholder="e.g. Model may hallucinate on low-frequency trade types — will require human review gate" value={s6.risks} onChange={e=>setS6({...s6,risks:e.target.value})} />
+              <TA rows={3} placeholder="e.g. Model may hallucinate on low-frequency trade types" value={s6.risks} onChange={e=>setS6({...s6,risks:e.target.value})} />
             </Field>
           </>)}
 
@@ -559,50 +612,40 @@ function ARIAIntakeForm() {
             {s7.team.map((row,i)=><TeamRow key={i} row={row} index={i} onChange={updTeam} onRemove={rmTeam} />)}
             <button onClick={addTeam} style={{fontSize:13,color:sc.accent,background:"none",border:"none",cursor:"pointer",fontFamily:"inherit",padding:0,marginTop:4,fontWeight:600}}>+ Add team member</button>
             <div style={{borderTop:`1px solid ${C.mistDark}`,margin:"20px 0"}} />
-            <Field label="Resource constraints or blockers">
-              <TA rows={3} placeholder="Known capacity issues, hiring gaps, or competing priorities that could affect delivery" value={s7.constraints} onChange={e=>setS7({...s7,constraints:e.target.value})} />
-            </Field>
-            <Field label="Additional notes for the AI CoE">
-              <TA rows={3} placeholder="Anything else the review committee should know about this submission" value={s7.notes} onChange={e=>setS7({...s7,notes:e.target.value})} />
-            </Field>
+            <Field label="Resource constraints or blockers"><TA rows={3} placeholder="Known capacity issues, hiring gaps, competing priorities" value={s7.constraints} onChange={e=>setS7({...s7,constraints:e.target.value})} /></Field>
+            <Field label="Additional notes for the AI CoE"><TA rows={3} placeholder="Anything else the review committee should know" value={s7.notes} onChange={e=>setS7({...s7,notes:e.target.value})} /></Field>
             <div style={{marginTop:24,padding:"18px 22px",background:"#f5f5f5",border:"1px solid #d8d8d8",borderRadius:12}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#555555",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>Submission summary</div>
+              <div style={{fontSize:11,fontWeight:700,color:"#555",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:12}}>Submission summary</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 24px",fontSize:13}}>
                 <div><span style={{color:C.textLight}}>Initiative: </span><span style={{color:C.navy,fontWeight:600}}>{s1.name||"—"}</span></div>
                 <div><span style={{color:C.textLight}}>Use case ID: </span><span style={{fontFamily:"monospace",color:C.navy,fontWeight:700}}>{useCaseId}</span></div>
                 <div><span style={{color:C.textLight}}>Business line: </span><span style={{color:C.navy}}>{s1.businessLine||"—"}</span></div>
                 <div><span style={{color:C.textLight}}>Vendor: </span><span style={{color:C.navy}}>{s1.vendor||"—"}</span></div>
                 <div><span style={{color:C.textLight}}>Total cost: </span><span style={{color:C.navy}}>{s4.totalCost?"$"+pf(s4.totalCost).toLocaleString():"—"}</span></div>
-                <div><span style={{color:C.textLight}}>Annual value: </span><span style={{color:"#1a1a1a",fontWeight:av>0?700:400}}>{fmt(av)}</span></div>
+                <div><span style={{color:C.textLight}}>Annual value: </span><span style={{color:C.navy,fontWeight:av>0?700:400}}>{fmt(av)}</span></div>
               </div>
             </div>
+            {saveError && <div style={{marginTop:12,padding:"10px 14px",background:"#fce8e8",border:"1px solid #f0b0b0",borderRadius:8,fontSize:13,color:"#a01a1a"}}>{saveError}</div>}
           </>)}
 
         </div>
 
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:20 }}>
-          <button onClick={()=>setStep(Math.max(1,step-1))} disabled={step===1} style={{
-            padding:"10px 24px", border:`1.5px solid ${C.border}`, borderRadius:10,
-            background:C.white, color:step===1?C.textLight:C.navy,
-            fontSize:14, fontWeight:700, cursor:step===1?"default":"pointer", fontFamily:"inherit",
-          }}>← Back</button>
-
+          <button onClick={()=>setStep(Math.max(1,step-1))} disabled={step===1} style={{ padding:"10px 24px", border:`1.5px solid ${C.border}`, borderRadius:10, background:C.white, color:step===1?C.textLight:C.navy, fontSize:14, fontWeight:700, cursor:step===1?"default":"pointer", fontFamily:"inherit" }}>← Back</button>
           <div style={{display:"flex",gap:6,alignItems:"center"}}>
             {STEPS.map((_,idx)=>(
               <div key={idx} style={{width:idx+1===step?20:6,height:6,borderRadius:99,background:idx+1===step?sc.accent:idx+1<step?sc.mid:C.mistDark,transition:"all 0.3s",cursor:"pointer"}} onClick={()=>setStep(idx+1)} />
             ))}
           </div>
-
           {step<7
             ? <button onClick={()=>setStep(Math.min(7,step+1))} style={{padding:"10px 28px",border:"none",borderRadius:10,background:C.navy,color:C.white,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Continue →</button>
-            : <button onClick={()=>setSubmitted(true)} style={{padding:"10px 28px",border:"none",borderRadius:10,background:"#1a1a1a",color:"#ffffff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Submit for review →</button>
+            : <button onClick={handleSubmit} disabled={saving} style={{padding:"10px 28px",border:"none",borderRadius:10,background:saving?"#888":"#1a1a1a",color:"#fff",fontSize:14,fontWeight:700,cursor:saving?"default":"pointer",fontFamily:"inherit"}}>{saving?"Saving...":"Submit for review →"}</button>
           }
         </div>
       </div>
     </div>
   );
 }
-
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(ARIAIntakeForm));
