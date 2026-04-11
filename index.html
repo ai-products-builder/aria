@@ -22,10 +22,52 @@ const { useState } = React;
 
 const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-async function saveToSupabase(data) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/aria_usecases`, {
+const SCORING_PROMPT = `You are the ARIA prioritization engine for an enterprise AI portfolio management platform at Capital Group, a leading asset management firm.
+
+Score this AI initiative across 6 dimensions (each 1-5):
+
+1. strategic_fit: 5=supports 2+ pillars AND on AI CoE roadmap, 4=1-2 pillars on roadmap, 3=1 pillar not on roadmap, 2=partial alignment, 1=no alignment
+2. expected_impact (based on annual_value): 5=>$2M, 4=$1M-$2M, 3=$500K-$1M, 2=$100K-$500K, 1=<$100K or unknown
+3. feasibility (problem clarity, dependencies, team): 5=clear problem+full team+no blockers, 4=mostly clear, 3=some gaps, 2=significant gaps, 1=unclear+no team
+4. cost (lower=higher score, based on total_cost): 5=<$100K, 4=$100K-$250K, 3=$250K-$500K, 2=$500K-$1M, 1=>$1M
+5. resource (team completeness, constraints): 5=all named+confirmed, 4=mostly named, 3=some TBD, 2=most TBD, 1=no team
+6. risk (data_class, model_risk, regs, legal_needed, client_data): 5=low risk across all, 4=moderate, 3=elevated, 2=high, 1=critical
+
+COMPOSITE = (strategic_fit×0.25 + expected_impact×0.20 + feasibility×0.20 + cost×0.15 + resource×0.10 + risk×0.10) × 20
+
+RECOMMENDATION: Prioritize (>=70), Review (45-69), Deprioritize (<45)
+
+Respond ONLY with valid JSON, no markdown:
+{"score_strategic_fit":0,"score_expected_impact":0,"score_feasibility":0,"score_cost":0,"score_resource":0,"score_risk":0,"composite_score":0,"recommendation":"Review","score_rationale":{"strategic_fit":"","expected_impact":"","feasibility":"","cost":"","resource":"","risk":""},"score_flags":[],"score_summary":""}`;
+
+async function scoreWithClaude(submissionData) {
+  const response = await fetch(ANTHROPIC_URL, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{
+        role: "user",
+        content: SCORING_PROMPT + "\n\nSubmission data:\n" + JSON.stringify(submissionData, null, 2)
+      }]
+    })
+  });
+  const data = await response.json();
+  const text = data.content[0].text;
+  const clean = text.replace(/```json|```/g, "").trim();
+  return JSON.parse(clean);
+}
+
+async function saveToSupabase(data, id) {
+  const url = id
+    ? `${SUPABASE_URL}/rest/v1/aria_usecases?use_case_id=eq.${id}`
+    : `${SUPABASE_URL}/rest/v1/aria_usecases`;
+  const method = id ? "PATCH" : "POST";
+  const res = await fetch(url, {
+    method,
     headers: {
       "Content-Type": "application/json",
       "apikey": SUPABASE_KEY,
@@ -34,10 +76,7 @@ async function saveToSupabase(data) {
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
-  }
+  if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
@@ -46,9 +85,7 @@ const C = {
   text: "#1a1a1a", textMid: "#555555", textLight: "#999999", white: "#ffffff",
   warn: "#fff8e8", warnBorder: "#e0c060", warnText: "#7a4d00",
 };
-
 const STEP_COLORS = Array(7).fill({ bg: "#f5f5f5", accent: "#333333", mid: "#cccccc" });
-
 const VENDORS = [
   { group: "Anthropic / Claude", options: ["Claude (Anthropic)"] },
   { group: "AI coding & dev tools", options: ["Cursor", "GitHub Copilot", "Tabnine", "Codeium"] },
@@ -58,7 +95,6 @@ const VENDORS = [
   { group: "Data & analytics AI", options: ["Databricks (DBRX)", "Snowflake Cortex", "DataRobot"] },
   { group: "Other", options: ["Other / not listed", "Internal / proprietary model"] },
 ];
-
 const REGISTRY = ["Claude (Anthropic)","Azure OpenAI","AWS Bedrock","Google Vertex AI","GitHub Copilot","Microsoft Copilot (M365)","Salesforce Einstein","ServiceNow AI","IBM watsonx","Snowflake Cortex","Databricks (DBRX)","DataRobot","Glean","Moveworks","Writer","Internal / proprietary model"];
 const PROBLEM_TYPES = ["Automation","Decision support","Data extraction","Content generation","Prediction / forecasting","Search & retrieval","Monitoring & alerting","Client experience"];
 const PILLARS = ["Operational excellence","Investment performance","Client outcomes","Risk & compliance","Data & technology modernization","Growth & distribution"];
@@ -192,20 +228,52 @@ function TeamRow({ row, onChange, onRemove, index }) {
   );
 }
 
-function ARIAIntakeForm() {
+function ARIAIntakeForm({ editData, onSaved }) {
+  const isEdit = !!editData;
   const [step, setStep] = useState(1);
-  const [useCaseId] = useState(genId);
+  const [useCaseId] = useState(editData ? editData.use_case_id : genId);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingStage, setSavingStage] = useState("");
   const [saveError, setSaveError] = useState(null);
+  const [scoreResult, setScoreResult] = useState(null);
 
-  const [s1, setS1] = useState({ name:"", businessLine:"", team:"", sponsor:"", owner:"", startDate:today(), goLiveDate:sixMonths(), vendor:"", otherVendor:"" });
-  const [s2, setS2] = useState({ problem:"", adopters:"", whyNow:"", inaction:"", problemTypes:[] });
-  const [s3, setS3] = useState({ pillars:[], howAligned:"", roadmap:"", dependencies:"" });
-  const [s4, setS4] = useState({ totalCost:"", confidence:"Rough order of magnitude (±50%)", buildCost:"", licenseCost:"", runCost:"", returnType:"", costFTEs:"", costTimePct:"", costSalary:"", costLicenses:"", costLicenseAmt:"", costInfra:"", effHrs:"", effRate:"", effErrors:"", effErrorCost:"", effQueries:"", effQueryCost:"", revDeals:"", revDealValue:"", revLift:"", revBase:"", riskProb:"", riskIncident:"", riskFine:"", riskFineLikely:"", mixCost:"", mixEff:"", mixRev:"", mixRisk:"" });
-  const [s5, setS5] = useState({ kpiCats:[], kpis:[{name:"",baseline:"",target:""}], measureMethod:"", realizationOwner:"", success90:"", success12mo:"", uxMethods:[] });
-  const [s6, setS6] = useState({ dataClass:"", clientData:"", regs:[], modelRisk:"", legalNeeded:"No", legalStatus:"", legalAreas:[], risks:"" });
-  const [s7, setS7] = useState({ team:[{role:"",name:"",pct:""}], constraints:"", notes:"" });
+  function initS1() {
+    if (!editData) return { name:"", businessLine:"", team:"", sponsor:"", owner:"", startDate:today(), goLiveDate:sixMonths(), vendor:"", otherVendor:"" };
+    return { name:editData.name||"", businessLine:editData.business_line||"", team:editData.team||"", sponsor:editData.sponsor||"", owner:editData.owner||"", startDate:editData.start_date||today(), goLiveDate:editData.go_live_date||sixMonths(), vendor:editData.vendor||"", otherVendor:editData.other_vendor||"" };
+  }
+  function initS2() {
+    if (!editData) return { problem:"", adopters:"", whyNow:"", inaction:"", problemTypes:[] };
+    return { problem:editData.problem||"", adopters:editData.adopters||"", whyNow:editData.why_now||"", inaction:editData.inaction||"", problemTypes:editData.problem_types||[] };
+  }
+  function initS3() {
+    if (!editData) return { pillars:[], howAligned:"", roadmap:"", dependencies:"" };
+    return { pillars:editData.pillars||[], howAligned:editData.how_aligned||"", roadmap:editData.roadmap||"", dependencies:editData.dependencies||"" };
+  }
+  function initS4() {
+    if (!editData) return { totalCost:"", confidence:"Rough order of magnitude (±50%)", buildCost:"", licenseCost:"", runCost:"", returnType:"", costFTEs:"", costTimePct:"", costSalary:"", costLicenses:"", costLicenseAmt:"", costInfra:"", effHrs:"", effRate:"", effErrors:"", effErrorCost:"", effQueries:"", effQueryCost:"", revDeals:"", revDealValue:"", revLift:"", revBase:"", riskProb:"", riskIncident:"", riskFine:"", riskFineLikely:"", mixCost:"", mixEff:"", mixRev:"", mixRisk:"" };
+    return { totalCost:editData.total_cost||"", confidence:editData.cost_confidence||"Rough order of magnitude (±50%)", buildCost:editData.build_cost||"", licenseCost:editData.license_cost||"", runCost:editData.run_cost||"", returnType:editData.return_type||"", costFTEs:editData.cost_ftes||"", costTimePct:editData.cost_time_pct||"", costSalary:editData.cost_salary||"", costLicenses:editData.cost_licenses||"", costLicenseAmt:editData.cost_license_amt||"", costInfra:editData.cost_infra||"", effHrs:editData.eff_hrs||"", effRate:editData.eff_rate||"", effErrors:editData.eff_errors||"", effErrorCost:editData.eff_error_cost||"", effQueries:editData.eff_queries||"", effQueryCost:editData.eff_query_cost||"", revDeals:editData.rev_deals||"", revDealValue:editData.rev_deal_value||"", revLift:editData.rev_lift||"", revBase:editData.rev_base||"", riskProb:editData.risk_prob||"", riskIncident:editData.risk_incident||"", riskFine:editData.risk_fine||"", riskFineLikely:editData.risk_fine_likely||"", mixCost:editData.mix_cost||"", mixEff:editData.mix_eff||"", mixRev:editData.mix_rev||"", mixRisk:editData.mix_risk||"" };
+  }
+  function initS5() {
+    if (!editData) return { kpiCats:[], kpis:[{name:"",baseline:"",target:""}], measureMethod:"", realizationOwner:"", success90:"", success12mo:"", uxMethods:[] };
+    return { kpiCats:editData.kpi_cats||[], kpis:editData.kpis||[{name:"",baseline:"",target:""}], measureMethod:editData.measure_method||"", realizationOwner:editData.realization_owner||"", success90:editData.success_90||"", success12mo:editData.success_12mo||"", uxMethods:editData.ux_methods||[] };
+  }
+  function initS6() {
+    if (!editData) return { dataClass:"", clientData:"", regs:[], modelRisk:"", legalNeeded:"No", legalStatus:"", legalAreas:[], risks:"" };
+    return { dataClass:editData.data_class||"", clientData:editData.client_data||"", regs:editData.regs||[], modelRisk:editData.model_risk||"", legalNeeded:editData.legal_needed||"No", legalStatus:editData.legal_status||"", legalAreas:editData.legal_areas||[], risks:editData.risks||"" };
+  }
+  function initS7() {
+    if (!editData) return { team:[{role:"",name:"",pct:""}], constraints:"", notes:"" };
+    return { team:editData.team_members||[{role:"",name:"",pct:""}], constraints:editData.constraints||"", notes:editData.notes||"" };
+  }
+
+  const [s1, setS1] = useState(initS1);
+  const [s2, setS2] = useState(initS2);
+  const [s3, setS3] = useState(initS3);
+  const [s4, setS4] = useState(initS4);
+  const [s5, setS5] = useState(initS5);
+  const [s6, setS6] = useState(initS6);
+  const [s7, setS7] = useState(initS7);
 
   const shadowAI = s1.vendor && !REGISTRY.includes(s1.vendor);
   const sc = STEP_COLORS[step-1];
@@ -230,109 +298,174 @@ function ARIAIntakeForm() {
   function addTeam(){ setS7({...s7,team:[...s7.team,{role:"",name:"",pct:""}]}); }
   function rmTeam(i){ setS7({...s7,team:s7.team.filter((_,idx)=>idx!==i)}); }
 
+  function buildPayload() {
+    return {
+      use_case_id: useCaseId,
+      stage: editData ? editData.stage : "Ideation",
+      submitted_date: editData ? editData.submitted_date : today(),
+      name: s1.name,
+      business_line: s1.businessLine,
+      team: s1.team,
+      sponsor: s1.sponsor,
+      owner: s1.owner,
+      start_date: s1.startDate,
+      go_live_date: s1.goLiveDate,
+      vendor: s1.vendor,
+      other_vendor: s1.otherVendor || null,
+      problem: s2.problem,
+      adopters: s2.adopters,
+      why_now: s2.whyNow,
+      inaction: s2.inaction || null,
+      problem_types: s2.problemTypes,
+      pillars: s3.pillars,
+      how_aligned: s3.howAligned,
+      roadmap: s3.roadmap,
+      dependencies: s3.dependencies || null,
+      total_cost: pf(s4.totalCost),
+      cost_confidence: s4.confidence,
+      build_cost: pf(s4.buildCost) || null,
+      license_cost: pf(s4.licenseCost) || null,
+      run_cost: pf(s4.runCost) || null,
+      return_type: s4.returnType,
+      cost_ftes: pf(s4.costFTEs) || null,
+      cost_time_pct: pf(s4.costTimePct) || null,
+      cost_salary: pf(s4.costSalary) || null,
+      cost_licenses: pf(s4.costLicenses) || null,
+      cost_license_amt: pf(s4.costLicenseAmt) || null,
+      cost_infra: pf(s4.costInfra) || null,
+      eff_hrs: pf(s4.effHrs) || null,
+      eff_rate: pf(s4.effRate) || null,
+      eff_errors: pf(s4.effErrors) || null,
+      eff_error_cost: pf(s4.effErrorCost) || null,
+      eff_queries: pf(s4.effQueries) || null,
+      eff_query_cost: pf(s4.effQueryCost) || null,
+      rev_deals: pf(s4.revDeals) || null,
+      rev_deal_value: pf(s4.revDealValue) || null,
+      rev_lift: pf(s4.revLift) || null,
+      rev_base: pf(s4.revBase) || null,
+      risk_prob: pf(s4.riskProb) || null,
+      risk_incident: pf(s4.riskIncident) || null,
+      risk_fine: pf(s4.riskFine) || null,
+      risk_fine_likely: pf(s4.riskFineLikely) || null,
+      mix_cost: pf(s4.mixCost) || null,
+      mix_eff: pf(s4.mixEff) || null,
+      mix_rev: pf(s4.mixRev) || null,
+      mix_risk: pf(s4.mixRisk) || null,
+      annual_value: av || null,
+      payback_months: payback || null,
+      kpi_cats: s5.kpiCats,
+      kpis: s5.kpis,
+      measure_method: s5.measureMethod,
+      realization_owner: s5.realizationOwner,
+      success_90: s5.success90 || null,
+      success_12mo: s5.success12mo || null,
+      ux_methods: s5.uxMethods,
+      data_class: s6.dataClass,
+      client_data: s6.clientData,
+      regs: s6.regs,
+      model_risk: s6.modelRisk || null,
+      legal_needed: s6.legalNeeded,
+      legal_status: s6.legalStatus || null,
+      legal_areas: s6.legalAreas,
+      risks: s6.risks || null,
+      team_members: s7.team,
+      constraints: s7.constraints || null,
+      notes: s7.notes || null,
+    };
+  }
+
   async function handleSubmit() {
     setSaving(true);
     setSaveError(null);
     try {
-      const payload = {
-        use_case_id: useCaseId,
-        stage: "Ideation",
-        submitted_date: today(),
-        name: s1.name,
-        business_line: s1.businessLine,
-        team: s1.team,
-        sponsor: s1.sponsor,
-        owner: s1.owner,
-        start_date: s1.startDate,
-        go_live_date: s1.goLiveDate,
-        vendor: s1.vendor,
-        other_vendor: s1.otherVendor || null,
-        problem: s2.problem,
-        adopters: s2.adopters,
-        why_now: s2.whyNow,
-        inaction: s2.inaction || null,
-        problem_types: s2.problemTypes,
-        pillars: s3.pillars,
-        how_aligned: s3.howAligned,
-        roadmap: s3.roadmap,
-        dependencies: s3.dependencies || null,
-        total_cost: pf(s4.totalCost),
-        cost_confidence: s4.confidence,
-        build_cost: pf(s4.buildCost) || null,
-        license_cost: pf(s4.licenseCost) || null,
-        run_cost: pf(s4.runCost) || null,
-        return_type: s4.returnType,
-        cost_ftes: pf(s4.costFTEs) || null,
-        cost_time_pct: pf(s4.costTimePct) || null,
-        cost_salary: pf(s4.costSalary) || null,
-        cost_licenses: pf(s4.costLicenses) || null,
-        cost_license_amt: pf(s4.costLicenseAmt) || null,
-        cost_infra: pf(s4.costInfra) || null,
-        eff_hrs: pf(s4.effHrs) || null,
-        eff_rate: pf(s4.effRate) || null,
-        eff_errors: pf(s4.effErrors) || null,
-        eff_error_cost: pf(s4.effErrorCost) || null,
-        eff_queries: pf(s4.effQueries) || null,
-        eff_query_cost: pf(s4.effQueryCost) || null,
-        rev_deals: pf(s4.revDeals) || null,
-        rev_deal_value: pf(s4.revDealValue) || null,
-        rev_lift: pf(s4.revLift) || null,
-        rev_base: pf(s4.revBase) || null,
-        risk_prob: pf(s4.riskProb) || null,
-        risk_incident: pf(s4.riskIncident) || null,
-        risk_fine: pf(s4.riskFine) || null,
-        risk_fine_likely: pf(s4.riskFineLikely) || null,
-        mix_cost: pf(s4.mixCost) || null,
-        mix_eff: pf(s4.mixEff) || null,
-        mix_rev: pf(s4.mixRev) || null,
-        mix_risk: pf(s4.mixRisk) || null,
-        annual_value: av || null,
-        payback_months: payback || null,
-        kpi_cats: s5.kpiCats,
-        kpis: s5.kpis,
-        measure_method: s5.measureMethod,
-        realization_owner: s5.realizationOwner,
-        success_90: s5.success90 || null,
-        success_12mo: s5.success12mo || null,
-        ux_methods: s5.uxMethods,
-        data_class: s6.dataClass,
-        client_data: s6.clientData,
-        regs: s6.regs,
-        model_risk: s6.modelRisk || null,
-        legal_needed: s6.legalNeeded,
-        legal_status: s6.legalStatus || null,
-        legal_areas: s6.legalAreas,
-        risks: s6.risks || null,
-        team_members: s7.team,
-        constraints: s7.constraints || null,
-        notes: s7.notes || null,
-      };
-      await saveToSupabase(payload);
+      const payload = buildPayload();
+      setSavingStage("Saving submission...");
+      await saveToSupabase(payload, isEdit ? useCaseId : null);
+      setSavingStage("Scoring with Claude AI...");
+      const scores = await scoreWithClaude(payload);
+      setSavingStage("Saving scores...");
+      await saveToSupabase({ ...scores, scored_at: new Date().toISOString() }, useCaseId);
+      setScoreResult(scores);
       setSubmitted(true);
+      if (onSaved) onSaved();
     } catch(e) {
-      setSaveError("Submission failed: " + e.message);
+      setSaveError("Error: " + e.message);
     } finally {
       setSaving(false);
+      setSavingStage("");
     }
   }
 
-  if(submitted) return (
-    <div style={{ background:"#f2f2f2", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24, fontFamily:"'DM Sans',system-ui,sans-serif" }}>
-      <div style={{ background:C.white, borderRadius:20, padding:"48px 40px", maxWidth:480, width:"100%", textAlign:"center" }}>
-        <div style={{ width:64, height:64, borderRadius:"50%", background:"#ebebeb", border:"2px solid #cccccc", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 20px", fontSize:26, color:"#333" }}>✓</div>
-        <div style={{ fontSize:24, fontWeight:800, color:C.navy, marginBottom:8 }}>Submission received</div>
-        <div style={{ fontSize:14, color:C.textMid, lineHeight:1.7, marginBottom:28 }}>Your AI initiative has been submitted to the AI CoE for review. You'll receive a notification within 10 business days.</div>
-        <div style={{ background:"#ebebeb", border:"1px solid #cccccc", borderRadius:12, padding:"14px 24px", marginBottom:32, display:"inline-block" }}>
-          <div style={{ fontSize:11, color:"#555", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Use case ID</div>
-          <div style={{ fontSize:20, fontWeight:800, fontFamily:"monospace", color:C.navy }}>{useCaseId}</div>
-        </div>
-        <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
-          <button onClick={()=>{setSubmitted(false);setStep(1);}} style={{ padding:"11px 28px", background:C.navy, color:C.white, border:"none", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Submit another</button>
-          <a href="aria-repository.html" style={{ padding:"11px 28px", background:"#fff", color:C.navy, border:"1.5px solid #ccc", borderRadius:10, fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit", textDecoration:"none" }}>View repository →</a>
+  const REC_COLORS = {
+    "Prioritize":   { bg:"#e6f4ea", color:"#1a7a3c", border:"#a0d4b0" },
+    "Review":       { bg:"#fff8e0", color:"#a06000", border:"#f0d080" },
+    "Deprioritize": { bg:"#fce8e8", color:"#a01a1a", border:"#f0a0a0" },
+  };
+
+  if(submitted && scoreResult) {
+    const rc = REC_COLORS[scoreResult.recommendation] || REC_COLORS["Review"];
+    const dims = [
+      { label:"Strategic fit",    score:scoreResult.score_strategic_fit,    note:scoreResult.score_rationale?.strategic_fit },
+      { label:"Expected impact",  score:scoreResult.score_expected_impact,  note:scoreResult.score_rationale?.expected_impact },
+      { label:"Feasibility",      score:scoreResult.score_feasibility,      note:scoreResult.score_rationale?.feasibility },
+      { label:"Cost",             score:scoreResult.score_cost,             note:scoreResult.score_rationale?.cost },
+      { label:"Resource",         score:scoreResult.score_resource,         note:scoreResult.score_rationale?.resource },
+      { label:"Risk",             score:scoreResult.score_risk,             note:scoreResult.score_rationale?.risk },
+    ];
+    return (
+      <div style={{ background:"#f2f2f2", minHeight:"100vh", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"40px 24px", fontFamily:"'DM Sans',system-ui,sans-serif" }}>
+        <div style={{ background:C.white, borderRadius:20, padding:"40px", maxWidth:600, width:"100%" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
+            <div style={{ width:48, height:48, borderRadius:"50%", background:"#ebebeb", border:"2px solid #ccc", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>✓</div>
+            <div>
+              <div style={{ fontSize:18, fontWeight:800, color:C.navy }}>{isEdit ? "Changes saved" : "Submission received"}</div>
+              <div style={{ fontSize:13, color:C.textLight, fontFamily:"monospace" }}>{useCaseId}</div>
+            </div>
+          </div>
+
+          <div style={{ padding:"14px 18px", background:rc.bg, border:`1px solid ${rc.border}`, borderRadius:12, marginBottom:20 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:rc.color, textTransform:"uppercase", letterSpacing:"0.06em" }}>AI CoE Recommendation</span>
+              <span style={{ fontSize:20, fontWeight:800, color:rc.color }}>{scoreResult.recommendation}</span>
+            </div>
+            <div style={{ fontSize:13, color:C.textMid, lineHeight:1.6 }}>{scoreResult.score_summary}</div>
+          </div>
+
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+            <span style={{ fontSize:13, fontWeight:600, color:C.textMid }}>Composite score</span>
+            <span style={{ fontSize:28, fontWeight:800, color:C.navy }}>{scoreResult.composite_score}<span style={{ fontSize:14, color:C.textLight }}>/100</span></span>
+          </div>
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:16 }}>
+            {dims.map(d => (
+              <div key={d.label} style={{ padding:"10px 12px", background:C.mist, borderRadius:8 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                  <span style={{ fontSize:12, fontWeight:600, color:C.textMid }}>{d.label}</span>
+                  <span style={{ fontSize:14, fontWeight:700, color:C.navy }}>{d.score}/5</span>
+                </div>
+                <div style={{ fontSize:11, color:C.textLight, lineHeight:1.4 }}>{d.note}</div>
+              </div>
+            ))}
+          </div>
+
+          {scoreResult.score_flags && scoreResult.score_flags.length > 0 && (
+            <div style={{ padding:"10px 14px", background:"#fff8e0", border:"1px solid #f0d080", borderRadius:8, marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"#a06000", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:6 }}>Flags for AI CoE review</div>
+              {scoreResult.score_flags.map((f,i) => (
+                <div key={i} style={{ fontSize:12, color:"#7a4d00", marginBottom:2 }}>• {f}</div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display:"flex", gap:10, justifyContent:"center", marginTop:20 }}>
+            {!isEdit && <button onClick={()=>{setSubmitted(false);setStep(1);}} style={{ padding:"10px 20px", background:C.navy, color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Submit another</button>}
+            {isEdit && <button onClick={()=>{ if(onSaved) onSaved(); }} style={{ padding:"10px 20px", background:C.navy, color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" }}>Back to repository</button>}
+            <a href="aria-repository.html" style={{ padding:"10px 20px", background:"#fff", color:C.navy, border:"1.5px solid #ccc", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit", textDecoration:"none" }}>View repository →</a>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div style={{ background:C.mist, minHeight:"100vh", fontFamily:"'DM Sans',system-ui,sans-serif" }}>
@@ -342,7 +475,7 @@ function ARIAIntakeForm() {
             <div style={{ width:28, height:28, borderRadius:8, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#fff" }}>A</div>
             <span style={{ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }}>ARIA</span>
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }}>·</span>
-            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>New AI initiative intake</span>
+            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>{isEdit ? "Edit initiative" : "New AI initiative intake"}</span>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <a href="aria-repository.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>View repository →</a>
@@ -380,7 +513,7 @@ function ARIAIntakeForm() {
             <div style={{ display:"inline-flex", alignItems:"center", gap:10, padding:"7px 14px", background:"#ebebeb", border:"1px solid #cccccc", borderRadius:10, marginBottom:24 }}>
               <span style={{ fontSize:11, fontWeight:700, color:"#555", textTransform:"uppercase", letterSpacing:"0.07em" }}>Use case ID</span>
               <span style={{ fontSize:13, fontWeight:800, fontFamily:"monospace", color:C.navy }}>{useCaseId}</span>
-              <span style={{ fontSize:11, padding:"2px 8px", background:"#d0d0d0", borderRadius:99, color:"#333", fontWeight:600 }}>Auto-assigned</span>
+              <span style={{ fontSize:11, padding:"2px 8px", background:"#d0d0d0", borderRadius:99, color:"#333", fontWeight:600 }}>{isEdit ? "Editing" : "Auto-assigned"}</span>
             </div>
             <Field label="AI initiative name" required><Input type="text" placeholder="e.g. Automated trade reconciliation assistant" value={s1.name} onChange={e=>setS1({...s1,name:e.target.value})} /></Field>
             <TwoCol>
@@ -393,7 +526,7 @@ function ARIAIntakeForm() {
               <Field label="Business unit / team" required>
                 <Sel value={s1.team} onChange={e=>setS1({...s1,team:e.target.value})}>
                   <option value="">Select team</option>
-                  {["Equity Research","Fixed Income","Multi-Asset","Portfolio Analytics","Trade Operations","Compliance","Client Reporting","Data & Technology","Risk Management"].map(o=><option key={o}>{o}</option>)}
+                  {["Equity Research","Fixed Income","Multi-Asset","Portfolio Analytics","Trade Operations","Compliance","Client Reporting","Data & Technology","Risk Management","Client Group"].map(o=><option key={o}>{o}</option>)}
                 </Sel>
               </Field>
             </TwoCol>
@@ -626,8 +759,12 @@ function ARIAIntakeForm() {
               </div>
             </div>
             {saveError && <div style={{marginTop:12,padding:"10px 14px",background:"#fce8e8",border:"1px solid #f0b0b0",borderRadius:8,fontSize:13,color:"#a01a1a"}}>{saveError}</div>}
+            {saving && (
+              <div style={{marginTop:12,padding:"10px 14px",background:"#f0f7ff",border:"1px solid #b0d0f0",borderRadius:8,fontSize:13,color:"#1a5fa0",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>⟳</span> {savingStage}
+              </div>
+            )}
           </>)}
-
         </div>
 
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:20 }}>
@@ -639,7 +776,7 @@ function ARIAIntakeForm() {
           </div>
           {step<7
             ? <button onClick={()=>setStep(Math.min(7,step+1))} style={{padding:"10px 28px",border:"none",borderRadius:10,background:C.navy,color:C.white,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Continue →</button>
-            : <button onClick={handleSubmit} disabled={saving} style={{padding:"10px 28px",border:"none",borderRadius:10,background:saving?"#888":"#1a1a1a",color:"#fff",fontSize:14,fontWeight:700,cursor:saving?"default":"pointer",fontFamily:"inherit"}}>{saving?"Saving...":"Submit for review →"}</button>
+            : <button onClick={handleSubmit} disabled={saving} style={{padding:"10px 28px",border:"none",borderRadius:10,background:saving?"#888":"#1a1a1a",color:"#fff",fontSize:14,fontWeight:700,cursor:saving?"default":"pointer",fontFamily:"inherit"}}>{saving?"Processing...":isEdit?"Save changes →":"Submit for review →"}</button>
           }
         </div>
       </div>
@@ -647,8 +784,35 @@ function ARIAIntakeForm() {
   );
 }
 
+// ── Entry point — check URL params for edit mode ──────────────────────────────
+function App() {
+  const params = new URLSearchParams(window.location.search);
+  const editId = params.get("edit");
+  const [editData, setEditData] = useState(null);
+  const [loading, setLoading] = useState(!!editId);
+
+  React.useEffect(() => {
+    if (!editId) return;
+    fetch(`${SUPABASE_URL}/rest/v1/aria_usecases?use_case_id=eq.${editId}&select=*`, {
+      headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+    })
+    .then(r => r.json())
+    .then(rows => { if (rows[0]) setEditData(rows[0]); })
+    .catch(console.error)
+    .finally(() => setLoading(false));
+  }, [editId]);
+
+  if (loading) return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", fontFamily:"'DM Sans',system-ui,sans-serif", color:"#555", fontSize:14 }}>
+      Loading initiative...
+    </div>
+  );
+
+  return <ARIAIntakeForm editData={editData} onSaved={()=>{ window.location.href = "aria-repository.html"; }} />;
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(React.createElement(ARIAIntakeForm));
+root.render(React.createElement(App));
   </script>
 </body>
 </html>
