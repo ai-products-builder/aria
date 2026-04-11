@@ -21,451 +21,113 @@
   <script type="text/babel">
 const { useState, useEffect } = React;
 
-const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const SURL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
+const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
 
-const SCORING_PROMPT = `You are the ARIA prioritization engine for an enterprise AI portfolio management platform at Capital Group.
-
-Score this AI initiative across 6 dimensions (each 1-5):
-1. strategic_fit: 5=supports 2+ pillars AND on AI CoE roadmap, 4=1-2 pillars on roadmap, 3=1 pillar not on roadmap, 2=partial, 1=none
-2. expected_impact (annual_value): 5=>$2M, 4=$1M-$2M, 3=$500K-$1M, 2=$100K-$500K, 1=<$100K
-3. feasibility (problem clarity, deps, team): 5=clear+full team+no blockers, 4=mostly, 3=some gaps, 2=significant gaps, 1=unclear+no team
-4. cost (lower=higher score, total_cost): 5=<$100K, 4=$100K-$250K, 3=$250K-$500K, 2=$500K-$1M, 1=>$1M
+const SCORE_PROMPT = `You are the ARIA prioritization engine for Capital Group. Score this AI initiative across 6 dimensions (each 1-5):
+1. strategic_fit: 5=2+ pillars+on roadmap, 4=1-2 pillars+on roadmap, 3=1 pillar not on roadmap, 2=partial, 1=none
+2. expected_impact (annual_value): 5=>$2M, 4=$1M-2M, 3=$500K-1M, 2=$100K-500K, 1=<$100K
+3. feasibility (team/deps/clarity): 5=full team+clear+no blockers, 4=mostly, 3=some gaps, 2=major gaps, 1=none
+4. cost (lower=higher score): 5=<$100K, 4=$100K-250K, 3=$250K-500K, 2=$500K-1M, 1=>$1M
 5. resource (team completeness): 5=all named+confirmed, 4=mostly named, 3=some TBD, 2=most TBD, 1=no team
-6. risk (data_class, model_risk, regs, legal): 5=low risk all, 4=moderate, 3=elevated, 2=high, 1=critical
+6. risk (data/model/regs/legal): 5=low all, 4=moderate, 3=elevated, 2=high, 1=critical
+COMPOSITE=(strategic_fit*0.25+expected_impact*0.20+feasibility*0.20+cost*0.15+resource*0.10+risk*0.10)*20
+RECOMMENDATION: Prioritize>=70, Review 45-69, Deprioritize<45
+Return ONLY valid JSON no markdown: {"score_strategic_fit":0,"score_expected_impact":0,"score_feasibility":0,"score_cost":0,"score_resource":0,"score_risk":0,"composite_score":0,"recommendation":"Review","score_rationale":{"strategic_fit":"","expected_impact":"","feasibility":"","cost":"","resource":"","risk":""},"score_flags":[],"score_summary":""}`;
 
-COMPOSITE = (strategic_fit×0.25 + expected_impact×0.20 + feasibility×0.20 + cost×0.15 + resource×0.10 + risk×0.10) × 20
-RECOMMENDATION: Prioritize (>=70), Review (45-69), Deprioritize (<45)
-
-Respond ONLY with valid JSON no markdown:
-{"score_strategic_fit":0,"score_expected_impact":0,"score_feasibility":0,"score_cost":0,"score_resource":0,"score_risk":0,"composite_score":0,"recommendation":"Review","score_rationale":{"strategic_fit":"","expected_impact":"","feasibility":"","cost":"","resource":"","risk":""},"score_flags":[],"score_summary":""}`;
-
-async function scoreWithClaude(data) {
-  const res = await fetch(ANTHROPIC_URL, {
+async function callClaude(data) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
-      messages: [{ role: "user", content: SCORING_PROMPT + "\n\nSubmission:\n" + JSON.stringify(data, null, 2) }]
+      messages: [{ role: "user", content: SCORE_PROMPT + "\n\nData:\n" + JSON.stringify(data) }]
     })
   });
   const d = await res.json();
-  const text = d.content[0].text.replace(/```json|```/g, "").trim();
-  return JSON.parse(text);
+  return JSON.parse(d.content[0].text.replace(/```json|```/g, "").trim());
 }
 
-async function fetchSubmissions() {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/aria_usecases?select=*&order=submitted_date.desc`, {
-    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+async function sbFetch() {
+  const res = await fetch(SURL + "/rest/v1/aria_usecases?select=*&order=submitted_date.desc", {
+    headers: { "apikey": SKEY, "Authorization": "Bearer " + SKEY }
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-async function patchSupabase(useCase_id, data) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/aria_usecases?use_case_id=eq.${useCase_id}`, {
+async function sbPatch(uid, data) {
+  const res = await fetch(SURL + "/rest/v1/aria_usecases?use_case_id=eq." + uid, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": SUPABASE_KEY,
-      "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Prefer": "return=representation"
-    },
+    headers: { "Content-Type": "application/json", "apikey": SKEY, "Authorization": "Bearer " + SKEY, "Prefer": "return=representation" },
     body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-function mapRow(r) {
-  return {
-    id: r.use_case_id, stage: r.stage, submittedDate: r.submitted_date,
-    raw: r,
-    composite_score: r.composite_score,
-    recommendation: r.recommendation,
-    score_rationale: r.score_rationale,
-    score_flags: r.score_flags,
-    score_summary: r.score_summary,
-    score_strategic_fit: r.score_strategic_fit,
-    score_expected_impact: r.score_expected_impact,
-    score_feasibility: r.score_feasibility,
-    score_cost: r.score_cost,
-    score_resource: r.score_resource,
-    score_risk: r.score_risk,
-    scored_at: r.scored_at,
-    s1: { name:r.name, businessLine:r.business_line, team:r.team, sponsor:r.sponsor, owner:r.owner, startDate:r.start_date, goLiveDate:r.go_live_date, vendor:r.vendor, otherVendor:r.other_vendor },
-    s2: { problem:r.problem, adopters:r.adopters, whyNow:r.why_now, inaction:r.inaction, problemTypes:r.problem_types||[] },
-    s3: { pillars:r.pillars||[], howAligned:r.how_aligned, roadmap:r.roadmap, dependencies:r.dependencies },
-    s4: { totalCost:r.total_cost, confidence:r.cost_confidence, buildCost:r.build_cost, licenseCost:r.license_cost, runCost:r.run_cost, returnType:r.return_type, annualValue:r.annual_value, payback:r.payback_months,
-      calcInputs: buildCalcInputs(r) },
-    s5: { kpiCats:r.kpi_cats||[], kpis:r.kpis||[], measureMethod:r.measure_method, realizationOwner:r.realization_owner, success90:r.success_90, success12mo:r.success_12mo, uxMethods:r.ux_methods||[] },
-    s6: { dataClass:r.data_class, clientData:r.client_data, regs:r.regs||[], modelRisk:r.model_risk, legalNeeded:r.legal_needed, legalStatus:r.legal_status, legalAreas:r.legal_areas||[], risks:r.risks },
-    s7: { team:r.team_members||[], constraints:r.constraints, notes:r.notes },
-  };
-}
-
-function buildCalcInputs(r) {
-  const f = v => v ? "$" + Number(v).toLocaleString() : "—";
-  const rt = r.return_type;
-  if(rt==="Cost savings") return [
-    {label:"FTE redeployment", a:r.cost_ftes?r.cost_ftes+" FTEs":"—", subtotal:r.cost_ftes&&r.cost_time_pct&&r.cost_salary?f(r.cost_ftes*(r.cost_time_pct/100)*r.cost_salary)+"/yr":"—"},
-    {label:"Licenses eliminated", a:r.cost_licenses?r.cost_licenses+" licenses":"—", subtotal:r.cost_licenses&&r.cost_license_amt?f(r.cost_licenses*r.cost_license_amt)+"/yr":"—"},
-    {label:"Infrastructure reduction", a:"—", subtotal:r.cost_infra?f(r.cost_infra)+"/yr":"—"},
-  ];
-  if(rt==="Efficiency / productivity") return [
-    {label:"Hours saved / week", a:r.eff_hrs?r.eff_hrs+" hrs":"—", b:r.eff_rate?f(r.eff_rate)+"/hr":"—", subtotal:r.eff_hrs&&r.eff_rate?f(r.eff_hrs*52*r.eff_rate)+"/yr":"—"},
-    {label:"Errors reduced / month", a:r.eff_errors?r.eff_errors+" errors":"—", b:r.eff_error_cost?f(r.eff_error_cost)+"/error":"—", subtotal:r.eff_errors&&r.eff_error_cost?f(r.eff_errors*12*r.eff_error_cost)+"/yr":"—"},
-    {label:"Queries deflected / month", a:r.eff_queries?r.eff_queries+" queries":"—", b:r.eff_query_cost?f(r.eff_query_cost)+"/query":"—", subtotal:r.eff_queries&&r.eff_query_cost?f(r.eff_queries*12*r.eff_query_cost)+"/yr":"—"},
-  ];
-  if(rt==="Risk reduction") return [
-    {label:"Incident avoidance", a:r.risk_prob?r.risk_prob+"% prob":"—", subtotal:r.risk_prob&&r.risk_incident?f((r.risk_prob/100)*r.risk_incident)+"/yr":"—"},
-    {label:"Regulatory fine", a:r.risk_fine_likely?r.risk_fine_likely+"% likelihood":"—", subtotal:r.risk_fine&&r.risk_fine_likely?f(r.risk_fine*(r.risk_fine_likely/100))+"/yr":"—"},
-  ];
-  if(rt==="Revenue generation") return [
-    {label:"New deals", a:r.rev_deals?r.rev_deals+" deals/yr":"—", subtotal:r.rev_deals&&r.rev_deal_value?f(r.rev_deals*r.rev_deal_value)+"/yr":"—"},
-    {label:"Conversion lift", a:r.rev_lift?r.rev_lift+"%":"—", subtotal:r.rev_lift&&r.rev_base?f((r.rev_lift/100)*r.rev_base)+"/yr":"—"},
-  ];
-  if(rt==="Mixed (multiple types)") return [
-    {label:"Cost savings", a:"—", subtotal:r.mix_cost?f(r.mix_cost):"—"},
-    {label:"Efficiency gains", a:"—", subtotal:r.mix_eff?f(r.mix_eff):"—"},
-    {label:"Revenue generated", a:"—", subtotal:r.mix_rev?f(r.mix_rev):"—"},
-    {label:"Risk avoided", a:"—", subtotal:r.mix_risk?f(r.mix_risk):"—"},
-  ];
-  return [];
-}
-
 const C = {
-  navy: "#1a1a1a",
-  mist: "#f2f2f2",
-  mistDark: "#e0e0e0",
-  border: "#d4d4d4",
-  borderDark: "#bbbbbb",
-  text: "#1a1a1a",
-  textMid: "#555555",
-  textLight: "#999999",
-  white: "#ffffff",
-  card: "#ffffff",
+  navy:"#1a1a1a", mist:"#f2f2f2", mistDark:"#e0e0e0", border:"#d4d4d4",
+  text:"#1a1a1a", textMid:"#555555", textLight:"#999999", white:"#ffffff"
 };
 
 const STAGE_COLORS = {
-  "Ideation":   { bg: "#f0f0f0", color: "#555555", border: "#cccccc" },
-  "Assessment": { bg: "#e8f0fe", color: "#1a56a0", border: "#b0c8f0" },
-  "Approved":   { bg: "#e6f4ea", color: "#1a7a3c", border: "#a0d4b0" },
-  "In development": { bg: "#fff4e0", color: "#a05a00", border: "#f0c870" },
-  "Piloting":   { bg: "#f3e8fe", color: "#6a1ab0", border: "#c8a0f0" },
-  "Live":       { bg: "#e0f7fa", color: "#007a8a", border: "#80d4e0" },
-  "Retired":    { bg: "#fce8e8", color: "#a01a1a", border: "#f0a0a0" },
+  "Ideation":       { bg:"#f0f0f0",  color:"#555555", border:"#cccccc" },
+  "Assessment":     { bg:"#e8f0fe",  color:"#1a56a0", border:"#b0c8f0" },
+  "Approved":       { bg:"#e6f4ea",  color:"#1a7a3c", border:"#a0d4b0" },
+  "In development": { bg:"#fff4e0",  color:"#a05a00", border:"#f0c870" },
+  "Piloting":       { bg:"#f3e8fe",  color:"#6a1ab0", border:"#c8a0f0" },
+  "Live":           { bg:"#e0f7fa",  color:"#007a8a", border:"#80d4e0" },
+  "Retired":        { bg:"#fce8e8",  color:"#a01a1a", border:"#f0a0a0" },
 };
 
-const SUBMISSIONS = [
+const REC_COLORS = {
+  "Prioritize":   { bg:"#e6f4ea", color:"#1a7a3c", border:"#a0d4b0" },
+  "Review":       { bg:"#fff8e0", color:"#a06000", border:"#f0d080" },
+  "Deprioritize": { bg:"#fce8e8", color:"#a01a1a", border:"#f0a0a0" },
+};
+
+const HARDCODED = [
   {
-    id: "ARIA-2026-4821",
-    stage: "Assessment",
-    submittedDate: "2026-04-01",
-    s1: {
-      name: "AI-Powered Trade Reconciliation Assistant",
-      businessLine: "Operations",
-      team: "Trade Operations",
-      sponsor: "Sarah Chen, Chief Operating Officer",
-      owner: "Marcus Obi, VP Trade Operations",
-      startDate: "2026-05-01",
-      goLiveDate: "2026-10-15",
-      vendor: "Claude (Anthropic)",
-    },
-    s2: {
-      problem: "Trade operations analysts spend 3–4 hours per day manually reconciling discrepancies between our order management system and custodian records. The process is entirely manual — analysts pull data from 4 separate systems, paste into Excel, and cross-reference line by line. Error rates average 2.3% per month, each requiring costly remediation averaging $4,200 per incident.",
-      adopters: "62 trade operations analysts across 3 regional teams (Americas, EMEA, APAC). All 62 are primary users from day one. Secondary users include 12 portfolio managers who consume reconciliation reports.",
-      whyNow: "Trade volume has grown 34% YoY and we are onboarding two new custodians in Q3 2026. Manual capacity cannot scale. The SEC's updated Rule 17a-3 record-keeping requirements effective January 2027 also increase the compliance burden on current manual processes.",
-      inaction: "Without automation, we will need to hire 8 additional analysts at $120K fully-loaded each ($960K/yr) to keep pace with volume growth. Continued error rates expose us to regulatory scrutiny and potential client reporting failures.",
-      problemTypes: ["Automation", "Data extraction", "Monitoring & alerting"],
-    },
-    s3: {
-      pillars: ["Operational excellence", "Risk & compliance"],
-      howAligned: "Automating reconciliation directly advances our operational excellence pillar by eliminating the highest-volume manual process in Trade Operations. It also supports risk & compliance by reducing human error in regulatory reporting and positioning us ahead of the January 2027 SEC Rule 17a-3 changes.",
-      roadmap: "Yes — already on the AI CoE roadmap",
-      dependencies: "Depends on the Data Fabric initiative (ARIA-2026-0018) for unified data access layer. Overlaps with the Custodian API integration project (IT-2025-114) — coordination required on data schema.",
-    },
-    s4: {
-      totalCost: 485000,
-      confidence: "Budgetary estimate (±25%)",
-      buildCost: 280000,
-      licenseCost: 95000,
-      runCost: 110000,
-      returnType: "Efficiency / productivity",
-      calcInputs: [
-        { label: "Hours saved / week", a: "186 hrs", b: "$72/hr", subtotal: "$696,384/yr" },
-        { label: "Errors reduced / month", a: "28 errors", b: "$4,200/error", subtotal: "$1,411,200/yr" },
-        { label: "Queries deflected / month", a: "—", b: "—", subtotal: "—" },
-      ],
-      annualValue: 2107584,
-      payback: 3,
-    },
-    s5: {
-      kpiCats: ["Time savings", "Error reduction", "Adoption rate"],
-      kpis: [
-        { name: "Hours saved per user per week", unit: "hrs/week", baseline: "3.5", target: "0.5" },
-        { name: "Error rate in processed records", unit: "% of records", baseline: "2.3", target: "0.3" },
-        { name: "User adoption rate", unit: "% of team", baseline: "0", target: "90" },
-      ],
-      measureMethod: "Hours saved tracked via analyst time-log surveys (bi-weekly). Error rate pulled from reconciliation audit log in OMS — automated report generated weekly by Data Engineering. Adoption rate via Azure AD login analytics dashboard.",
-      realizationOwner: "Priya Nair, Senior Manager Trade Operations",
-      success90: "All 62 analysts are actively using the tool daily. Manual Excel reconciliation has been eliminated for standard trade types. Analysts report spending less than 30 minutes per day on reconciliation vs. the current 3–4 hours.",
-      success12mo: "The tool handles 95%+ of reconciliation volume autonomously. Analysts are redeployed to exception management and counterparty relationship work. The team proactively requests expansion to cover new custodians and asset classes.",
-      uxMethods: ["User interviews", "CSAT survey", "Usage analytics"],
-    },
-    s6: {
-      dataClass: "Confidential",
-      clientData: "No",
-      regs: ["SEC", "FINRA", "SOX"],
-      modelRisk: "Medium — AI-assisted, human in the loop",
-      legalNeeded: "Yes",
-      legalStatus: "In progress",
-      legalAreas: ["Vendor / third-party contracts", "Data licensing"],
-      risks: "1. Model may misclassify edge-case trade types (e.g. multi-leg derivatives, cross-currency swaps) — mitigation: human review gate for any trade flagged as low-confidence.\n2. Data quality: OMS feed has known latency issues during peak settlement windows — mitigation: reconciliation runs scheduled for off-peak hours.\n3. Claude API dependency: if Anthropic API is unavailable, fallback to manual queue — runbook required.",
-    },
-    s7: {
-      team: [
-        { role: "Product manager", name: "Marcus Obi", pct: "50" },
-        { role: "ML engineer", name: "Data & Technology — TBD hire", pct: "100" },
-        { role: "Software engineer", name: "James Lim, Platform Engineering", pct: "75" },
-        { role: "Business analyst", name: "Anika Sharma, Trade Ops", pct: "50" },
-        { role: "Risk & compliance", name: "David Torres, Compliance", pct: "25" },
-      ],
-      constraints: "ML engineer role is currently open — requisition submitted, target hire date May 2026. If hire is delayed beyond June, go-live date will slip by 6–8 weeks. James Lim is also allocated 25% to the Custodian API project — coordination with IT-2025-114 PM required.",
-      notes: "This submission has been pre-reviewed informally with the AI CoE in March 2026. Sarah Chen has committed budget subject to formal AI CoE approval. Recommend fast-tracking to Assessment stage given regulatory timeline pressure from SEC Rule 17a-3.",
-    },
+    id:"ARIA-2026-4821", stage:"Assessment", submittedDate:"2026-04-01",
+    s1:{ name:"AI-Powered Trade Reconciliation Assistant", businessLine:"Operations", team:"Trade Operations", sponsor:"Sarah Chen, Chief Operating Officer", owner:"Marcus Obi, VP Trade Operations", startDate:"2026-05-01", goLiveDate:"2026-10-15", vendor:"Claude (Anthropic)" },
+    s2:{ problem:"Trade operations analysts spend 3-4 hours per day manually reconciling discrepancies between the OMS and custodian records. Error rates average 2.3% per month, each requiring costly remediation averaging $4,200 per incident.", adopters:"62 trade operations analysts across 3 regional teams (Americas, EMEA, APAC). Secondary: 12 portfolio managers.", whyNow:"Trade volume up 34% YoY. Two new custodians onboarding Q3 2026. SEC Rule 17a-3 effective January 2027.", inaction:"Need to hire 8 additional analysts at $120K each ($960K/yr) without automation.", problemTypes:["Automation","Data extraction","Monitoring & alerting"] },
+    s3:{ pillars:["Operational excellence","Risk & compliance"], howAligned:"Eliminates highest-volume manual process in Trade Operations. Positions firm ahead of January 2027 SEC Rule 17a-3 changes.", roadmap:"Yes — already on the AI CoE roadmap", dependencies:"Depends on Data Fabric (ARIA-2026-0018). Overlaps with Custodian API project (IT-2025-114)." },
+    s4:{ totalCost:485000, confidence:"Budgetary estimate (±25%)", buildCost:280000, licenseCost:95000, runCost:110000, returnType:"Efficiency / productivity", annualValue:2107584, payback:3, calcInputs:[{label:"Hours saved / week",a:"186 hrs",b:"$72/hr",subtotal:"$696,384/yr"},{label:"Errors reduced / month",a:"28 errors",b:"$4,200/error",subtotal:"$1,411,200/yr"},{label:"Queries deflected / month",a:"—",b:"—",subtotal:"—"}] },
+    s5:{ kpiCats:["Time savings","Error reduction","Adoption rate"], kpis:[{name:"Hours saved per user per week",unit:"hrs/week",baseline:"3.5",target:"0.5"},{name:"Error rate in processed records",unit:"% of records",baseline:"2.3",target:"0.3"},{name:"User adoption rate",unit:"% of team",baseline:"0",target:"90"}], measureMethod:"Analyst time-log surveys bi-weekly. OMS audit log weekly. Azure AD login analytics.", realizationOwner:"Priya Nair, Senior Manager Trade Operations", success90:"All 62 analysts using tool daily. Manual Excel reconciliation eliminated.", success12mo:"Tool handles 95%+ volume. Analysts redeployed to exception management.", uxMethods:["User interviews","CSAT survey","Usage analytics"] },
+    s6:{ dataClass:"Confidential", clientData:"No", regs:["SEC","FINRA","SOX"], modelRisk:"Medium — AI-assisted, human in the loop", legalNeeded:"Yes", legalStatus:"In progress", legalAreas:["Vendor / third-party contracts","Data licensing"], risks:"1. Edge-case trade misclassification — human review gate.\n2. OMS feed latency — off-peak scheduling.\n3. API dependency — manual fallback queue." },
+    s7:{ team:[{role:"Product manager",name:"Marcus Obi",pct:"50"},{role:"ML engineer",name:"TBD hire",pct:"100"},{role:"Software engineer",name:"James Lim",pct:"75"},{role:"Business analyst",name:"Anika Sharma",pct:"50"},{role:"Risk & compliance",name:"David Torres",pct:"25"}], constraints:"ML engineer role open. James Lim 25% on Custodian API project.", notes:"Pre-reviewed with AI CoE March 2026. Budget committed subject to formal approval." },
   },
   {
-    id: "ARIA-2026-3047",
-    stage: "Ideation",
-    submittedDate: "2026-04-03",
-    s1: {
-      name: "Client Portfolio Commentary Generator",
-      businessLine: "Investments",
-      team: "Client Reporting",
-      sponsor: "David Park, Chief Investment Officer",
-      owner: "Lisa Nguyen, Head of Client Reporting",
-      startDate: "2026-06-01",
-      goLiveDate: "2026-11-30",
-      vendor: "Azure OpenAI",
-    },
-    s2: {
-      problem: "Portfolio managers and client reporting teams spend 12–15 hours per quarter per mandate drafting bespoke client commentary. With over 800 active mandates, this represents approximately 10,000 hours of high-cost analyst time annually. Commentary quality is inconsistent across writers, and turnaround times frequently miss client SLAs.",
-      adopters: "38 portfolio managers and 14 client reporting analysts — 52 total primary users. Secondary audience includes 6 relationship managers who review commentary before distribution.",
-      whyNow: "We are launching 120 new mandates in H2 2026 following the Meridian Wealth acquisition. Existing team cannot absorb the additional commentary volume without missing SLAs. Competitors including BlackRock and Vanguard have already deployed AI commentary tools.",
-      inaction: "Missing commentary SLAs risks client attrition. Hiring additional writers at current market rates would cost $180K+ per FTE. Quality inconsistency creates reputational and regulatory risk if commentary is misleading or non-compliant.",
-      problemTypes: ["Automation", "Content generation", "Decision support"],
-    },
-    s3: {
-      pillars: ["Client outcomes", "Operational excellence"],
-      howAligned: "Consistent, high-quality, timely client commentary is a direct driver of client retention and satisfaction — core to our client outcomes pillar. Reducing 10,000 hours of manual drafting annually also directly advances operational excellence.",
-      roadmap: "Partial — related to a roadmap item but scope differs",
-      dependencies: "Requires access to the portfolio data warehouse (Data Fabric — ARIA-2026-0018). Must integrate with the existing commentary approval workflow in Salesforce. Compliance pre-clearance required for any client-facing AI-generated content.",
-    },
-    s4: {
-      totalCost: 220000,
-      confidence: "Rough order of magnitude (±50%)",
-      buildCost: 120000,
-      licenseCost: 60000,
-      runCost: 40000,
-      returnType: "Efficiency / productivity",
-      calcInputs: [
-        { label: "Hours saved / week", a: "192 hrs", b: "$95/hr", subtotal: "$947,520/yr" },
-        { label: "Errors reduced / month", a: "—", b: "—", subtotal: "—" },
-        { label: "Queries deflected / month", a: "—", b: "—", subtotal: "—" },
-      ],
-      annualValue: 947520,
-      payback: 3,
-    },
-    s5: {
-      kpiCats: ["Time savings", "SLA / cycle time", "User satisfaction (NPS / CSAT)"],
-      kpis: [
-        { name: "Hours saved per user per week", unit: "hrs/week", baseline: "4.8", target: "0.8" },
-        { name: "SLA compliance rate", unit: "% on time", baseline: "71", target: "98" },
-        { name: "NPS / CSAT score", unit: "score", baseline: "62", target: "82" },
-      ],
-      measureMethod: "Time savings via quarterly PM time surveys. SLA compliance tracked in Salesforce commentary workflow — automated weekly report. CSAT via post-delivery client survey sent by relationship managers.",
-      realizationOwner: "Lisa Nguyen, Head of Client Reporting",
-      success90: "Commentary for standard equity and fixed income mandates is generated by the AI in under 10 minutes, reviewed by a PM in under 30, and distributed within 24 hours of quarter-end. No missed SLAs in first quarter of live operation.",
-      success12mo: "AI-generated commentary covers 90%+ of mandates with minimal PM editing. The team has been redeployed to higher-value bespoke client communications. Client satisfaction scores have improved measurably.",
-      uxMethods: ["User interviews", "NPS", "Quarterly business review"],
-    },
-    s6: {
-      dataClass: "Restricted — client data",
-      clientData: "Yes",
-      regs: ["SEC", "MiFID II", "GDPR"],
-      modelRisk: "High — AI makes or heavily influences decisions",
-      legalNeeded: "Yes",
-      legalStatus: "Not yet started",
-      legalAreas: ["Vendor / third-party contracts", "Regulatory obligation", "Privacy / data protection"],
-      risks: "1. AI-generated commentary could contain factual errors about portfolio performance — mitigation: mandatory PM review gate before any distribution.\n2. GDPR and MiFID II compliance for client data used to train/prompt the model — legal review required before build.\n3. Model may not handle complex multi-asset mandates consistently — scope to standard mandates only in v1.",
-    },
-    s7: {
-      team: [
-        { role: "Product manager", name: "Lisa Nguyen", pct: "30" },
-        { role: "Data scientist", name: "Raj Patel, Investment Analytics", pct: "50" },
-        { role: "Software engineer", name: "Platform Engineering — TBD", pct: "75" },
-        { role: "Business analyst", name: "Claire Hoffman, Client Reporting", pct: "50" },
-        { role: "Risk & compliance", name: "Sandra Yee, Legal & Compliance", pct: "20" },
-      ],
-      constraints: "Software engineer headcount not confirmed — pending IT resource allocation for H2 2026. Legal review has not started and may add 8–12 weeks to the timeline. Client data access requires DPA amendments with Azure.",
-      notes: "CIO David Park has flagged this as a priority for the Meridian integration. Recommend scheduling AI CoE review within 2 weeks. This is a high-visibility initiative — executive stakeholder management will be important.",
-    },
+    id:"ARIA-2026-3047", stage:"Ideation", submittedDate:"2026-04-03",
+    s1:{ name:"Client Portfolio Commentary Generator", businessLine:"Investments", team:"Client Reporting", sponsor:"David Park, Chief Investment Officer", owner:"Lisa Nguyen, Head of Client Reporting", startDate:"2026-06-01", goLiveDate:"2026-11-30", vendor:"Azure OpenAI" },
+    s2:{ problem:"PMs spend 12-15 hours per quarter per mandate drafting client commentary. 800+ active mandates = ~10,000 analyst hours annually. Commentary is inconsistent and SLAs are frequently missed.", adopters:"38 portfolio managers and 14 client reporting analysts — 52 primary users.", whyNow:"120 new mandates launching H2 2026 from Meridian Wealth acquisition.", inaction:"Missing SLAs risks client attrition. Additional writers cost $180K+ per FTE.", problemTypes:["Automation","Content generation","Decision support"] },
+    s3:{ pillars:["Client outcomes","Operational excellence"], howAligned:"Timely consistent commentary is a direct driver of client retention. Reduces 10,000 hours of manual drafting.", roadmap:"Partial — related to a roadmap item but scope differs", dependencies:"Data Fabric (ARIA-2026-0018). Salesforce commentary approval workflow. Compliance pre-clearance required." },
+    s4:{ totalCost:220000, confidence:"Rough order of magnitude (±50%)", buildCost:120000, licenseCost:60000, runCost:40000, returnType:"Efficiency / productivity", annualValue:947520, payback:3, calcInputs:[{label:"Hours saved / week",a:"192 hrs",b:"$95/hr",subtotal:"$947,520/yr"},{label:"Errors reduced / month",a:"—",b:"—",subtotal:"—"},{label:"Queries deflected / month",a:"—",b:"—",subtotal:"—"}] },
+    s5:{ kpiCats:["Time savings","SLA / cycle time","User satisfaction (NPS / CSAT)"], kpis:[{name:"Hours saved per user per week",unit:"hrs/week",baseline:"4.8",target:"0.8"},{name:"SLA compliance rate",unit:"% on time",baseline:"71",target:"98"},{name:"NPS / CSAT score",unit:"score",baseline:"62",target:"82"}], measureMethod:"Quarterly PM time surveys. Salesforce SLA tracking. Post-delivery client survey.", realizationOwner:"Lisa Nguyen, Head of Client Reporting", success90:"Standard mandates generated in <10 min, reviewed in <30, distributed within 24 hrs of quarter-end.", success12mo:"AI covers 90%+ of mandates with minimal editing. Team redeployed to bespoke communications.", uxMethods:["User interviews","NPS","Quarterly business review"] },
+    s6:{ dataClass:"Restricted — client data", clientData:"Yes", regs:["SEC","MiFID II","GDPR"], modelRisk:"High — AI makes or heavily influences decisions", legalNeeded:"Yes", legalStatus:"Not yet started", legalAreas:["Vendor / third-party contracts","Regulatory obligation","Privacy / data protection"], risks:"1. Factual errors in commentary — mandatory PM review gate.\n2. GDPR/MiFID II compliance — legal review required before build.\n3. Complex multi-asset mandates — scope to standard only in v1." },
+    s7:{ team:[{role:"Product manager",name:"Lisa Nguyen",pct:"30"},{role:"Data scientist",name:"Raj Patel",pct:"50"},{role:"Software engineer",name:"TBD",pct:"75"},{role:"Business analyst",name:"Claire Hoffman",pct:"50"},{role:"Risk & compliance",name:"Sandra Yee",pct:"20"}], constraints:"Software engineer not confirmed. Legal review not started — may add 8-12 weeks.", notes:"CIO David Park flagged as priority for Meridian integration." },
   },
   {
-    id: "ARIA-2026-5193",
-    stage: "Assessment",
-    submittedDate: "2026-03-28",
-    s1: {
-      name: "Regulatory Filing Compliance Checker",
-      businessLine: "Legal & Compliance",
-      team: "Compliance",
-      sponsor: "Rachel Moore, Chief Compliance Officer",
-      owner: "Tom Brady, Director of Regulatory Affairs",
-      startDate: "2026-05-15",
-      goLiveDate: "2026-09-30",
-      vendor: "Claude (Anthropic)",
-    },
-    s2: {
-      problem: "Compliance analysts manually review 200–300 regulatory filings per quarter against a changing matrix of SEC, FINRA, and MiFID II requirements. Each review takes 4–6 hours and requires cross-referencing 12+ regulatory documents. Errors or omissions in filings carry significant fine and reputational risk.",
-      adopters: "18 compliance analysts and 4 regulatory affairs managers — 22 primary users. Secondary users include 8 portfolio managers who receive compliance clearance decisions.",
-      whyNow: "The SEC's amended Marketing Rule and updated Form ADV requirements take effect Q3 2026, materially increasing the complexity of each filing review. Current team cannot absorb the additional review burden without either missing deadlines or accepting elevated error risk.",
-      inaction: "A single material filing error can result in SEC fines ranging from $50K to $500K and reputational damage that affects client retention and new business. The cost of inaction far exceeds the cost of this initiative.",
-      problemTypes: ["Automation", "Decision support", "Monitoring & alerting"],
-    },
-    s3: {
-      pillars: ["Risk & compliance", "Operational excellence"],
-      howAligned: "This initiative directly operationalises our risk & compliance pillar by reducing human error in regulatory filings — our highest-consequence compliance process. It also advances operational excellence by cutting review time from 4–6 hours to under 1 hour per filing.",
-      roadmap: "Yes — already on the AI CoE roadmap",
-      dependencies: "Requires integration with the regulatory document repository (SharePoint). Must connect to the compliance case management system (ServiceNow). Legal sign-off on use of AI in regulatory decision support required before go-live.",
-    },
-    s4: {
-      totalCost: 340000,
-      confidence: "Budgetary estimate (±25%)",
-      buildCost: 200000,
-      licenseCost: 80000,
-      runCost: 60000,
-      returnType: "Risk reduction",
-      calcInputs: [
-        { label: "Incident probability %", a: "15%", b: "$250,000 avg fine", subtotal: "$37,500/yr" },
-        { label: "Regulatory fine exposure", a: "$2,000,000", b: "8% likelihood", subtotal: "$160,000/yr" },
-      ],
-      annualValue: 197500,
-      payback: 21,
-    },
-    s5: {
-      kpiCats: ["Error reduction", "SLA / cycle time", "Risk reduction"],
-      kpis: [
-        { name: "Error rate in processed records", unit: "% of filings", baseline: "4.2", target: "0.5" },
-        { name: "Cycle time reduction", unit: "hrs per filing", baseline: "5.0", target: "0.8" },
-        { name: "SLA compliance rate", unit: "% on time", baseline: "84", target: "99" },
-      ],
-      measureMethod: "Error rate tracked via post-submission audit by Regulatory Affairs — monthly review. Cycle time logged in ServiceNow compliance case management. SLA compliance from ServiceNow automated reporting.",
-      realizationOwner: "Tom Brady, Director of Regulatory Affairs",
-      success90: "All standard SEC and FINRA filings are processed through the AI checker before submission. Review time has dropped below 1 hour for 80%+ of filings. No material errors in first quarter post-launch.",
-      success12mo: "The compliance team has full confidence in the AI checker for standard filings and is requesting expansion to MiFID II and new Form ADV requirements. Zero material filing errors in 12 months of live operation.",
-      uxMethods: ["User interviews", "Usage analytics", "Quarterly business review"],
-    },
-    s6: {
-      dataClass: "Restricted — regulatory",
-      clientData: "No",
-      regs: ["SEC", "FINRA", "MiFID II", "SOX"],
-      modelRisk: "High — AI makes or heavily influences decisions",
-      legalNeeded: "Yes",
-      legalStatus: "In progress",
-      legalAreas: ["Vendor / third-party contracts", "Regulatory obligation", "IP / model ownership"],
-      risks: "1. Model may misinterpret ambiguous regulatory language — mitigation: all AI decisions reviewed by a human compliance analyst before any filing submission.\n2. Regulatory requirements change frequently — mitigation: quarterly model refresh process with updated regulatory documents.\n3. Claude API availability — mitigation: manual fallback process documented in compliance runbook.",
-    },
-    s7: {
-      team: [
-        { role: "Product manager", name: "Tom Brady", pct: "40" },
-        { role: "ML engineer", name: "Wei Zhang, Data & Technology", pct: "100" },
-        { role: "Software engineer", name: "Platform Engineering TBD", pct: "50" },
-        { role: "Risk & compliance", name: "Rachel Moore (advisory)", pct: "10" },
-        { role: "Business analyst", name: "Fatima Al-Hassan, Compliance", pct: "60" },
-      ],
-      constraints: "Platform Engineering resource not yet allocated — dependency on IT planning cycle. Legal review of AI use in regulatory decisions may require external counsel — estimated 6–8 week delay. Q3 2026 SEC rule changes create a hard external deadline.",
-      notes: "CCO Rachel Moore has escalated this to the AI CoE as a priority given the Q3 2026 regulatory deadline. Recommend expedited review. Budget pre-approved by CFO pending AI CoE sign-off.",
-    },
+    id:"ARIA-2026-5193", stage:"Assessment", submittedDate:"2026-03-28",
+    s1:{ name:"Regulatory Filing Compliance Checker", businessLine:"Legal & Compliance", team:"Compliance", sponsor:"Rachel Moore, Chief Compliance Officer", owner:"Tom Brady, Director of Regulatory Affairs", startDate:"2026-05-15", goLiveDate:"2026-09-30", vendor:"Claude (Anthropic)" },
+    s2:{ problem:"Compliance analysts manually review 200-300 filings/quarter against SEC, FINRA, and MiFID II requirements. Each review takes 4-6 hours requiring 12+ regulatory documents.", adopters:"18 compliance analysts and 4 regulatory affairs managers — 22 primary users.", whyNow:"SEC amended Marketing Rule and Form ADV take effect Q3 2026 — materially increasing review complexity.", inaction:"A single material error = SEC fines $50K-$500K and reputational damage.", problemTypes:["Automation","Decision support","Monitoring & alerting"] },
+    s3:{ pillars:["Risk & compliance","Operational excellence"], howAligned:"Reduces human error in regulatory filings — highest-consequence compliance process. Cuts review from 4-6 hrs to <1 hr.", roadmap:"Yes — already on the AI CoE roadmap", dependencies:"SharePoint regulatory doc repository. ServiceNow compliance case management. Legal sign-off required." },
+    s4:{ totalCost:340000, confidence:"Budgetary estimate (±25%)", buildCost:200000, licenseCost:80000, runCost:60000, returnType:"Risk reduction", annualValue:197500, payback:21, calcInputs:[{label:"Incident avoidance",a:"15% probability",b:"$250K avg fine",subtotal:"$37,500/yr"},{label:"Regulatory fine",a:"8% likelihood",b:"$2M exposure",subtotal:"$160,000/yr"}] },
+    s5:{ kpiCats:["Error reduction","SLA / cycle time","Risk reduction"], kpis:[{name:"Error rate in processed records",unit:"% of filings",baseline:"4.2",target:"0.5"},{name:"Cycle time reduction",unit:"hrs per filing",baseline:"5.0",target:"0.8"},{name:"SLA compliance rate",unit:"% on time",baseline:"84",target:"99"}], measureMethod:"Post-submission audit monthly. ServiceNow cycle time. ServiceNow SLA reporting.", realizationOwner:"Tom Brady, Director of Regulatory Affairs", success90:"All standard filings through AI checker. Review time <1 hr for 80%+. No material errors Q1.", success12mo:"Full confidence in AI checker. Zero material filing errors in 12 months.", uxMethods:["User interviews","Usage analytics","Quarterly business review"] },
+    s6:{ dataClass:"Restricted — regulatory", clientData:"No", regs:["SEC","FINRA","MiFID II","SOX"], modelRisk:"High — AI makes or heavily influences decisions", legalNeeded:"Yes", legalStatus:"In progress", legalAreas:["Vendor / third-party contracts","Regulatory obligation","IP / model ownership"], risks:"1. Ambiguous regulatory language — human analyst reviews all AI decisions.\n2. Requirements change frequently — quarterly model refresh.\n3. API availability — manual fallback in compliance runbook." },
+    s7:{ team:[{role:"Product manager",name:"Tom Brady",pct:"40"},{role:"ML engineer",name:"Wei Zhang",pct:"100"},{role:"Software engineer",name:"TBD",pct:"50"},{role:"Risk & compliance",name:"Rachel Moore (advisory)",pct:"10"},{role:"Business analyst",name:"Fatima Al-Hassan",pct:"60"}], constraints:"Platform Engineering not allocated. Legal may require external counsel — 6-8 week delay.", notes:"CCO escalated as priority. Budget pre-approved by CFO pending AI CoE sign-off." },
   },
   {
-    id: "ARIA-2026-2288",
-    stage: "Ideation",
-    submittedDate: "2026-04-07",
-    s1: {
-      name: "Advisor Query Deflection Bot",
-      businessLine: "Distribution",
-      team: "Client Group",
-      sponsor: "James Wu, Head of Distribution",
-      owner: "Nina Patel, VP Advisor Experience",
-      startDate: "2026-07-01",
-      goLiveDate: "2026-12-15",
-      vendor: "Microsoft Copilot (M365)",
-    },
-    s2: {
-      problem: "Our advisor support team handles 4,200+ inbound queries per month from financial advisors — questions about fund performance, fees, account status, and product eligibility. 68% of these queries are repetitive and answerable from existing documentation. Each query costs an average of $38 to handle manually, and average wait times of 2.4 hours are causing advisor dissatisfaction.",
-      adopters: "22 advisor support agents (primary users — daily). 1,400+ registered financial advisors (end beneficiaries of faster responses). Secondary users: 6 distribution managers who monitor query resolution metrics.",
-      whyNow: "Advisor headcount attrition is running at 18% annually and we are unable to backfill fast enough. Q4 2026 will see peak query volume driven by year-end tax reporting season. Without deflection capability, we will enter peak season understaffed.",
-      inaction: "Advisor dissatisfaction is measurable — NPS from advisors has dropped 11 points over the past 12 months, and 3 large RIA relationships have cited support quality as a reason for reducing allocations. Continued underinvestment risks further attrition.",
-      problemTypes: ["Automation", "Search & retrieval", "Client experience"],
-    },
-    s3: {
-      pillars: ["Client outcomes", "Growth & distribution"],
-      howAligned: "Faster, more accurate advisor query resolution directly improves the advisor experience — a core driver of fund allocation decisions. Freeing support agents from repetitive queries allows them to focus on complex, high-value advisor relationships, supporting our growth & distribution pillar.",
-      roadmap: "No — new submission not on current roadmap",
-      dependencies: "Requires integration with the advisor CRM (Salesforce). Must connect to the fund data API for real-time performance and fee data. Microsoft Copilot M365 licensing already in place — no new vendor procurement required.",
-    },
-    s4: {
-      totalCost: 175000,
-      confidence: "Budgetary estimate (±25%)",
-      buildCost: 90000,
-      licenseCost: 35000,
-      runCost: 50000,
-      returnType: "Cost savings",
-      calcInputs: [
-        { label: "FTEs redeployed", a: "4 FTEs", b: "40% time freed", subtotal: "" },
-        { label: "Annual salary (avg)", a: "$85,000", b: "", subtotal: "$136,000/yr" },
-        { label: "Licenses eliminated", a: "0", b: "—", subtotal: "—" },
-      ],
-      annualValue: 272400,
-      payback: 8,
-    },
-    s5: {
-      kpiCats: ["Cost avoidance", "Adoption rate", "User satisfaction (NPS / CSAT)"],
-      kpis: [
-        { name: "User adoption rate", unit: "% of queries", baseline: "0", target: "65" },
-        { name: "NPS / CSAT score", unit: "advisor NPS", baseline: "34", target: "55" },
-        { name: "Cost avoided (annual)", unit: "$", baseline: "0", target: "272400" },
-      ],
-      measureMethod: "Query deflection rate tracked via Microsoft Copilot analytics dashboard — daily automated report. Advisor NPS via bi-annual advisor satisfaction survey run by Distribution. Cost avoidance calculated monthly by Finance based on query volume × cost per query.",
-      realizationOwner: "Nina Patel, VP Advisor Experience",
-      success90: "65%+ of repetitive advisor queries are resolved by the bot without agent escalation. Average query wait time has dropped from 2.4 hours to under 15 minutes. Agent capacity has been partially redeployed to complex relationship management.",
-      success12mo: "Bot handles 70%+ of all advisor queries. Advisor NPS has recovered to 55+. The support team is operating comfortably through the Q4 2026 peak season without additional headcount. Distribution leadership is requesting expansion to handle onboarding queries.",
-      uxMethods: ["CSAT survey", "Usage analytics", "Quarterly business review"],
-    },
-    s6: {
-      dataClass: "Confidential",
-      clientData: "No",
-      regs: ["SEC", "FINRA"],
-      modelRisk: "Medium — AI-assisted, human in the loop",
-      legalNeeded: "No",
-      legalStatus: "",
-      legalAreas: [],
-      risks: "1. Bot may provide outdated fund performance data if the Salesforce/fund API integration is not real-time — mitigation: data freshness indicator shown to advisor on every response.\n2. Advisor adoption risk — agents may not trust the bot initially — mitigation: change management plan with agent champions and incentive structure.\n3. Microsoft Copilot response quality for complex fund queries may be inconsistent — mitigation: escalation path to human agent always visible.",
-    },
-    s7: {
-      team: [
-        { role: "Product manager", name: "Nina Patel", pct: "50" },
-        { role: "Software engineer", name: "Distribution Tech TBD", pct: "75" },
-        { role: "Business analyst", name: "Kevin Marsh, Client Group", pct: "40" },
-        { role: "Change management lead", name: "Tara Singh, HR", pct: "25" },
-        { role: "Data engineer", name: "Platform Engineering TBD", pct: "50" },
-      ],
-      constraints: "Software engineer and data engineer roles not yet allocated from IT. Salesforce API integration depends on CRM team capacity — Q3 2026 availability not confirmed. Change management plan needs to be co-developed with Distribution leadership before go-live.",
-      notes: "James Wu has informally backed this initiative but has not yet formally committed budget. Recommend scheduling a pre-review call with AI CoE before formal submission review. Microsoft Copilot licensing already paid for — incremental cost is low.",
-    },
+    id:"ARIA-2026-2288", stage:"Ideation", submittedDate:"2026-04-07",
+    s1:{ name:"Advisor Query Deflection Bot", businessLine:"Distribution", team:"Client Group", sponsor:"James Wu, Head of Distribution", owner:"Nina Patel, VP Advisor Experience", startDate:"2026-07-01", goLiveDate:"2026-12-15", vendor:"Microsoft Copilot (M365)" },
+    s2:{ problem:"4,200+ advisor queries/month. 68% are repetitive and answerable from existing docs. Each costs $38 to handle. Average wait time 2.4 hours causing advisor dissatisfaction.", adopters:"22 advisor support agents (primary). 1,400+ financial advisors (beneficiaries). 6 distribution managers (secondary).", whyNow:"18% annual headcount attrition. Q4 2026 peak season approaching understaffed.", inaction:"Advisor NPS dropped 11 points. 3 large RIA relationships reduced allocations citing support quality.", problemTypes:["Automation","Search & retrieval","Client experience"] },
+    s3:{ pillars:["Client outcomes","Growth & distribution"], howAligned:"Faster advisor query resolution drives fund allocation decisions. Frees agents for complex high-value relationships.", roadmap:"No — new submission not on current roadmap", dependencies:"Salesforce CRM integration. Fund data API for real-time performance. M365 licensing already in place." },
+    s4:{ totalCost:175000, confidence:"Budgetary estimate (±25%)", buildCost:90000, licenseCost:35000, runCost:50000, returnType:"Cost savings", annualValue:272400, payback:8, calcInputs:[{label:"FTE redeployment",a:"4 FTEs × 40% freed",b:"$85K avg salary",subtotal:"$136,000/yr"},{label:"Query cost reduction",a:"2,856 queries deflected/mo",b:"$38/query",subtotal:"$136,400/yr"}] },
+    s5:{ kpiCats:["Cost avoidance","Adoption rate","User satisfaction (NPS / CSAT)"], kpis:[{name:"User adoption rate",unit:"% of queries",baseline:"0",target:"65"},{name:"NPS / CSAT score",unit:"advisor NPS",baseline:"34",target:"55"},{name:"Cost avoided (annual)",unit:"$",baseline:"0",target:"272400"}], measureMethod:"Copilot analytics dashboard daily. Bi-annual advisor NPS survey. Monthly Finance cost calculation.", realizationOwner:"Nina Patel, VP Advisor Experience", success90:"65%+ queries resolved without escalation. Wait time <15 minutes.", success12mo:"70%+ queries handled. Advisor NPS at 55+. Q4 peak handled without extra headcount.", uxMethods:["CSAT survey","Usage analytics","Quarterly business review"] },
+    s6:{ dataClass:"Confidential", clientData:"No", regs:["SEC","FINRA"], modelRisk:"Medium — AI-assisted, human in the loop", legalNeeded:"No", legalStatus:null, legalAreas:[], risks:"1. Outdated fund data risk — freshness indicator on every response.\n2. Adoption risk — change management plan with agent champions.\n3. Complex query inconsistency — escalation path always visible." },
+    s7:{ team:[{role:"Product manager",name:"Nina Patel",pct:"50"},{role:"Software engineer",name:"Distribution Tech TBD",pct:"75"},{role:"Business analyst",name:"Kevin Marsh",pct:"40"},{role:"Change management lead",name:"Tara Singh",pct:"25"},{role:"Data engineer",name:"Platform Engineering TBD",pct:"50"}], constraints:"Software engineer and data engineer not allocated. Salesforce API depends on CRM team Q3 availability.", notes:"James Wu informally backed but not formally committed budget. M365 licensing already paid." },
   },
 ];
 
@@ -473,127 +135,137 @@ function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
 
 function StageBadge({ stage }) {
   const s = STAGE_COLORS[stage] || STAGE_COLORS["Ideation"];
-  return (
-    <span style={ display:"inline-flex", alignItems:"center", padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:s.bg, color:s.color, border:`1px solid ${s.border}`, whiteSpace:"nowrap" }>
-      {stage}
-    </span>
-  );
+  return <span style={{ display:"inline-flex", alignItems:"center", padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:s.bg, color:s.color, border:"1px solid " + s.border, whiteSpace:"nowrap" }}>{stage}</span>;
+}
+
+function RecBadge({ rec }) {
+  if (!rec) return null;
+  const r = REC_COLORS[rec] || { bg:"#eee", color:"#555", border:"#ccc" };
+  return <span style={{ display:"inline-flex", alignItems:"center", padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:r.bg, color:r.color, border:"1px solid " + r.border, whiteSpace:"nowrap" }}>{rec}</span>;
 }
 
 function Tags({ items }) {
-  if (!items || items.length === 0) return <span style={ color: C.textLight, fontSize: 13 }>—</span>;
-  return (
-    <div style={ display:"flex", flexWrap:"wrap", gap:6, marginTop:4 }>
-      {items.map(t => (
-        <span key={t} style={ padding:"3px 10px", borderRadius:99, fontSize:12, background:"#f0f0f0", color:"#444", border:"1px solid #ddd" }>{t}</span>
-      ))}
-    </div>
-  );
+  if (!items || items.length === 0) return <span style={{ color:C.textLight, fontSize:13 }}>—</span>;
+  return <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:4 }}>{items.map(t => <span key={t} style={{ padding:"3px 10px", borderRadius:99, fontSize:12, background:"#f0f0f0", color:"#444", border:"1px solid #ddd" }}>{t}</span>)}</div>;
 }
 
 function Row({ label, value, mono }) {
   return (
-    <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-      <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>{label}</div>
-      <div style={ fontSize:13, color:C.text, lineHeight:1.6, fontFamily: mono ? "monospace" : "inherit", whiteSpace:"pre-wrap" }>{value || "—"}</div>
+    <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+      <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>{label}</div>
+      <div style={{ fontSize:13, color:C.text, lineHeight:1.6, fontFamily:mono?"monospace":"inherit", whiteSpace:"pre-wrap" }}>{value || "—"}</div>
     </div>
   );
 }
 
-function Section({ title, children }) {
+function Sec({ title, children }) {
   return (
-    <div style={ marginBottom:28 }>
-      <div style={ display:"flex", alignItems:"center", gap:10, marginBottom:12 }>
-        <div style={ width:3, height:16, borderRadius:99, background:"#333", flexShrink:0 } />
-        <span style={ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#555" }>{title}</span>
-        <div style={ flex:1, height:1, background:C.mistDark } />
+    <div style={{ marginBottom:28 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+        <div style={{ width:3, height:16, borderRadius:99, background:"#333", flexShrink:0 }} />
+        <span style={{ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#555" }}>{title}</span>
+        <div style={{ flex:1, height:1, background:C.mistDark }} />
       </div>
       {children}
     </div>
   );
 }
 
-function DetailPanel({ sub }) {
-  const av = sub.s4.annualValue;
-  const tc = sub.s4.totalCost;
+function ScoreSection({ sub, onRescore, rescoring }) {
+  if (!sub.composite_score && !sub.recommendation) {
+    return (
+      <Sec title="AI CoE Prioritization Score">
+        <div style={{ padding:"16px 18px", background:"#f5f5f5", border:"1px solid #e0e0e0", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <span style={{ fontSize:13, color:C.textMid }}>This submission has not been scored yet.</span>
+          <button onClick={onRescore} disabled={rescoring} style={{ padding:"8px 16px", border:"none", borderRadius:8, background:C.navy, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>{rescoring ? "Scoring..." : "Score now"}</button>
+        </div>
+      </Sec>
+    );
+  }
+  const rc = REC_COLORS[sub.recommendation] || { bg:"#f0f0f0", color:"#555", border:"#ccc" };
+  const dims = [
+    { label:"Strategic fit",   score:sub.score_strategic_fit,   note:sub.score_rationale && sub.score_rationale.strategic_fit },
+    { label:"Expected impact", score:sub.score_expected_impact, note:sub.score_rationale && sub.score_rationale.expected_impact },
+    { label:"Feasibility",     score:sub.score_feasibility,     note:sub.score_rationale && sub.score_rationale.feasibility },
+    { label:"Cost",            score:sub.score_cost,            note:sub.score_rationale && sub.score_rationale.cost },
+    { label:"Resource",        score:sub.score_resource,        note:sub.score_rationale && sub.score_rationale.resource },
+    { label:"Risk",            score:sub.score_risk,            note:sub.score_rationale && sub.score_rationale.risk },
+  ];
   return (
-    <div style={ padding:"28px 32px", overflowY:"auto", height:"100%", boxSizing:"border-box" }>
-
-      <div style={ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, flexWrap:"wrap", gap:12 }>
-        <div>
-          <div style={ fontSize:20, fontWeight:800, color:C.navy, marginBottom:4 }>{sub.s1.name}</div>
-          <div style={ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }>
-            <StageBadge stage={sub.stage} />
-            <span style={ fontSize:12, fontFamily:"monospace", color:C.textLight }>{sub.id}</span>
-            <span style={ fontSize:12, color:C.textLight }>Submitted {sub.submittedDate}</span>
+    <Sec title="AI CoE Prioritization Score">
+      <div style={{ padding:"14px 18px", background:rc.bg, border:"1px solid " + rc.border, borderRadius:12, marginBottom:12 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <span style={{ fontSize:11, fontWeight:700, color:rc.color, textTransform:"uppercase", letterSpacing:"0.06em" }}>Recommendation</span>
+            <span style={{ fontSize:14, fontWeight:700, color:rc.color }}>{sub.recommendation}</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
+            <span style={{ fontSize:26, fontWeight:800, color:C.navy }}>{sub.composite_score}</span>
+            <span style={{ fontSize:12, color:C.textLight }}>/100</span>
           </div>
         </div>
-        <div style={ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, minWidth:300 }>
-          {[
-            { label:"Total cost", value: fmt(tc) },
-            { label:"Annual value", value: fmt(av) },
-            { label:"Payback", value: sub.s4.payback ? sub.s4.payback + " mo" : "—" },
-          ].map(m => (
-            <div key={m.label} style={ background:C.mist, borderRadius:8, padding:"10px 14px" }>
-              <div style={ fontSize:11, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }>{m.label}</div>
-              <div style={ fontSize:16, fontWeight:700, color:C.navy }>{m.value}</div>
+        {sub.score_summary && <div style={{ fontSize:13, color:C.textMid, lineHeight:1.6 }}>{sub.score_summary}</div>}
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:12 }}>
+        {dims.map(d => (
+          <div key={d.label} style={{ padding:"8px 10px", background:"#f5f5f5", borderRadius:8 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+              <span style={{ fontSize:11, fontWeight:600, color:"#888" }}>{d.label}</span>
+              <span style={{ fontSize:13, fontWeight:700, color:C.navy }}>{d.score || "—"}/5</span>
             </div>
-          ))}
+            {d.note && <div style={{ fontSize:11, color:"#999", lineHeight:1.4 }}>{d.note}</div>}
+          </div>
+        ))}
+      </div>
+      {sub.score_flags && sub.score_flags.length > 0 && (
+        <div style={{ padding:"8px 12px", background:"#fff8e0", border:"1px solid #f0d080", borderRadius:8, marginBottom:8 }}>
+          <div style={{ fontSize:10, fontWeight:700, color:"#a06000", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Flags for AI CoE</div>
+          {sub.score_flags.map((f,i) => <div key={i} style={{ fontSize:12, color:"#7a4d00" }}>• {f}</div>)}
+        </div>
+      )}
+      <div style={{ display:"flex", gap:8, alignItems:"center", justifyContent:"flex-end" }}>
+        {sub.scored_at && <span style={{ fontSize:11, color:"#bbb" }}>Scored {new Date(sub.scored_at).toLocaleString()}</span>}
+        <button onClick={onRescore} disabled={rescoring} style={{ padding:"6px 14px", border:"1px solid #ccc", borderRadius:8, background:"#fff", color:C.navy, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>{rescoring ? "Scoring..." : "Re-score"}</button>
+      </div>
+    </Sec>
+  );
+}
+
+function DetailPanel({ sub, onRescore, rescoring }) {
+  return (
+    <div style={{ padding:"28px 32px", overflowY:"auto", height:"100%", boxSizing:"border-box" }}>
+      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div style={{ fontSize:20, fontWeight:800, color:C.navy, marginBottom:6 }}>{sub.s1.name}</div>
+          <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+            <StageBadge stage={sub.stage} />
+            {sub.recommendation && <RecBadge rec={sub.recommendation} />}
+            <span style={{ fontSize:12, fontFamily:"monospace", color:C.textLight }}>{sub.id}</span>
+            <span style={{ fontSize:12, color:C.textLight }}>Submitted {sub.submittedDate}</span>
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <a href={"index.html?edit=" + sub.id} style={{ padding:"8px 16px", borderRadius:8, border:"1px solid #ccc", background:"#fff", color:C.navy, fontSize:13, fontWeight:600, textDecoration:"none", cursor:"pointer" }}>Edit</a>
+          <button onClick={onRescore} disabled={rescoring} style={{ padding:"8px 16px", borderRadius:8, border:"none", background:C.navy, color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>{rescoring ? "Scoring..." : "Re-score"}</button>
         </div>
       </div>
 
-      {sub.recommendation && (() => {
-        const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c",border:"#a0d4b0"},Review:{bg:"#fff8e0",color:"#a06000",border:"#f0d080"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a",border:"#f0a0a0"}[sub.recommendation]||{bg:"#f0f0f0",color:"#555",border:"#ccc"};
-        const dims = [
-          {label:"Strategic fit", score:sub.score_strategic_fit, note:sub.score_rationale?.strategic_fit},
-          {label:"Expected impact", score:sub.score_expected_impact, note:sub.score_rationale?.expected_impact},
-          {label:"Feasibility", score:sub.score_feasibility, note:sub.score_rationale?.feasibility},
-          {label:"Cost", score:sub.score_cost, note:sub.score_rationale?.cost},
-          {label:"Resource", score:sub.score_resource, note:sub.score_rationale?.resource},
-          {label:"Risk", score:sub.score_risk, note:sub.score_rationale?.risk},
-        ];
-        return (
-          <div style={marginBottom:28}>
-            <div style={display:"flex",alignItems:"center",gap:10,marginBottom:12}>
-              <div style={width:3,height:16,borderRadius:99,background:"#333",flexShrink:0} />
-              <span style={fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#555"}>AI CoE Prioritization Score</span>
-              <div style={flex:1,height:1,background:"#e0e0e0"} />
-              <button onClick={()=>handleRescore(sub)} disabled={rescoring} style={fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontFamily:"inherit",color:"#333"}>{rescoring?"Scoring...":"Re-score"}</button>
-              <a href={`index.html?edit=${sub.id}`} style={fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #1a1a1a",background:"#1a1a1a",cursor:"pointer",fontFamily:"inherit",color:"#fff",textDecoration:"none"}>Edit</a>
-            </div>
-            <div style={padding:"14px 18px",background:rc.bg,border:`1px solid ${rc.border}`,borderRadius:12,marginBottom:12}>
-              <div style={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}>
-                <span style={fontSize:11,fontWeight:700,color:rc.color,textTransform:"uppercase",letterSpacing:"0.06em"}>Recommendation</span>
-                <div style={display:"flex",alignItems:"baseline",gap:12}>
-                  <span style={fontSize:22,fontWeight:800,color:"#1a1a1a"}>{sub.composite_score}<span style={fontSize:12,color:"#999",fontWeight:400}>/100</span></span>
-                  <span style={fontSize:14,fontWeight:700,color:rc.color}>{sub.recommendation}</span>
-                </div>
-              </div>
-              <div style={fontSize:13,color:"#555",lineHeight:1.6}>{sub.score_summary}</div>
-            </div>
-            <div style={display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}>
-              {dims.map(d=>(
-                <div key={d.label} style={padding:"8px 10px",background:"#f5f5f5",borderRadius:8}>
-                  <div style={display:"flex",justifyContent:"space-between",marginBottom:3}>
-                    <span style={fontSize:11,fontWeight:600,color:"#888"}>{d.label}</span>
-                    <span style={fontSize:13,fontWeight:700,color:"#1a1a1a"}>{d.score}/5</span>
-                  </div>
-                  <div style={fontSize:11,color:"#999",lineHeight:1.4}>{d.note}</div>
-                </div>
-              ))}
-            </div>
-            {sub.score_flags && sub.score_flags.length > 0 && (
-              <div style={padding:"8px 12px",background:"#fff8e0",border:"1px solid #f0d080",borderRadius:8}>
-                <div style={fontSize:10,fontWeight:700,color:"#a06000",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}>Flags</div>
-                {sub.score_flags.map((f,i)=><div key={i} style={fontSize:12,color:"#7a4d00"}>• {f}</div>)}
-              </div>
-            )}
-            {sub.scored_at && <div style={fontSize:11,color:"#bbb",marginTop:6,textAlign:"right"}>Scored {new Date(sub.scored_at).toLocaleString()}</div>}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:28 }}>
+        {[
+          { label:"Total cost",    value:fmt(sub.s4.totalCost) },
+          { label:"Annual value",  value:fmt(sub.s4.annualValue) },
+          { label:"Payback",       value:sub.s4.payback ? sub.s4.payback + " mo" : "—" },
+        ].map(m => (
+          <div key={m.label} style={{ background:C.mist, borderRadius:8, padding:"10px 14px" }}>
+            <div style={{ fontSize:11, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>{m.label}</div>
+            <div style={{ fontSize:16, fontWeight:700, color:C.navy }}>{m.value}</div>
           </div>
-        );
-      })()}
-      <Section title="Step 1 — Basic information">
-        <Row label="Use case ID" value={sub.id} mono />
+        ))}
+      </div>
+
+      <ScoreSection sub={sub} onRescore={onRescore} rescoring={rescoring} />
+
+      <Sec title="Step 1 — Basic information">
         <Row label="AI initiative name" value={sub.s1.name} />
         <Row label="Business line" value={sub.s1.businessLine} />
         <Row label="Business unit / team" value={sub.s1.team} />
@@ -602,177 +274,197 @@ function DetailPanel({ sub }) {
         <Row label="Target start date" value={sub.s1.startDate} />
         <Row label="Expected go-live date" value={sub.s1.goLiveDate} />
         <Row label="AI tool / vendor" value={sub.s1.vendor} />
-      </Section>
+      </Sec>
 
-      <Section title="Step 2 — Problem statement">
+      <Sec title="Step 2 — Problem statement">
         <Row label="What problem are you solving?" value={sub.s2.problem} />
         <Row label="How many people will adopt this?" value={sub.s2.adopters} />
         <Row label="Why now?" value={sub.s2.whyNow} />
         <Row label="What happens if we don't act?" value={sub.s2.inaction} />
-        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Problem type</div>
+        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em" }}>Problem type</div>
           <Tags items={sub.s2.problemTypes} />
         </div>
-      </Section>
+      </Sec>
 
-      <Section title="Step 3 — Strategic alignment">
-        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Strategic pillars</div>
+      <Sec title="Step 3 — Strategic alignment">
+        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em" }}>Strategic pillars</div>
           <Tags items={sub.s3.pillars} />
         </div>
         <Row label="How does this support the pillar?" value={sub.s3.howAligned} />
         <Row label="On approved AI roadmap?" value={sub.s3.roadmap} />
         <Row label="Dependencies / related initiatives" value={sub.s3.dependencies} />
-      </Section>
+      </Sec>
 
-      <Section title="Step 4 — Investment & return">
+      <Sec title="Step 4 — Investment & return">
         <Row label="Total estimated cost" value={fmt(sub.s4.totalCost)} />
         <Row label="Cost confidence level" value={sub.s4.confidence} />
         <Row label="Build / dev cost" value={fmt(sub.s4.buildCost)} />
         <Row label="Licensing / vendor cost" value={fmt(sub.s4.licenseCost)} />
         <Row label="Annual run cost" value={fmt(sub.s4.runCost)} />
         <Row label="Primary return type" value={sub.s4.returnType} />
-        <div style={ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }>Calculator inputs</div>
-          <div style={ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }>
-            <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>Line item</div>
-            <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>Input A</div>
-            <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>Input B / Subtotal</div>
-            {sub.s4.calcInputs.map((r,i) => (
-              <>
-                <div key={"a"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{r.label}</div>
-                <div key={"b"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{r.a || "—"}</div>
-                <div key={"c"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{r.subtotal || r.b || "—"}</div>
-              </>
-            ))}
+        {sub.s4.calcInputs && sub.s4.calcInputs.length > 0 && (
+          <div style={{ padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+            <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Calculator inputs</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+              {["Line item","Input","Subtotal"].map(h => <div key={h} style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase" }}>{h}</div>)}
+              {sub.s4.calcInputs.map((r,i) => [
+                <div key={"a"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{r.label}</div>,
+                <div key={"b"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{r.a || r.b || "—"}</div>,
+                <div key={"c"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{r.subtotal || "—"}</div>,
+              ])}
+            </div>
           </div>
-        </div>
+        )}
         <Row label="Projected annual value" value={fmt(sub.s4.annualValue)} />
         <Row label="Payback period" value={sub.s4.payback ? sub.s4.payback + " months" : "—"} />
-      </Section>
+      </Sec>
 
-      <Section title="Step 5 — KPIs & success metrics">
-        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>KPI categories</div>
+      <Sec title="Step 5 — KPIs & success metrics">
+        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em" }}>KPI categories</div>
           <Tags items={sub.s5.kpiCats} />
         </div>
-        <div style={ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }>KPI targets</div>
-          <div style={ display:"grid", gridTemplateColumns:"1fr 100px 80px 80px", gap:8 }>
-            {["KPI","Unit","Baseline","Target"].map(h => (
-              <div key={h} style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>{h}</div>
-            ))}
-            {sub.s5.kpis.map((k,i) => (
-              <>
-                <div key={"kn"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{k.name}</div>
-                <div key={"ku"+i} style={ fontSize:13, color:C.textMid, padding:"4px 0" }>{k.unit}</div>
-                <div key={"kb"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{k.baseline}</div>
-                <div key={"kt"+i} style={ fontSize:13, fontWeight:600, color:C.navy, padding:"4px 0" }>{k.target}</div>
-              </>
-            ))}
+        {sub.s5.kpis && sub.s5.kpis.length > 0 && (
+          <div style={{ padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+            <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>KPI targets</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 100px 80px 80px", gap:8 }}>
+              {["KPI","Unit","Baseline","Target"].map(h => <div key={h} style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase" }}>{h}</div>)}
+              {sub.s5.kpis.map((k,i) => [
+                <div key={"n"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{k.name}</div>,
+                <div key={"u"+i} style={{ fontSize:13, color:C.textMid, padding:"4px 0" }}>{k.unit}</div>,
+                <div key={"b"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{k.baseline}</div>,
+                <div key={"t"+i} style={{ fontSize:13, fontWeight:600, color:C.navy, padding:"4px 0" }}>{k.target}</div>,
+              ])}
+            </div>
           </div>
-        </div>
+        )}
         <Row label="How will KPIs be measured?" value={sub.s5.measureMethod} />
         <Row label="Benefits realization owner" value={sub.s5.realizationOwner} />
         <Row label="Success at 90 days" value={sub.s5.success90} />
         <Row label="Success at 12 months" value={sub.s5.success12mo} />
-        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>UX assessment methods</div>
+        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em" }}>UX assessment</div>
           <Tags items={sub.s5.uxMethods} />
         </div>
-      </Section>
+      </Sec>
 
-      <Section title="Step 6 — Risk & compliance">
+      <Sec title="Step 6 — Risk & compliance">
         <Row label="Data classification" value={sub.s6.dataClass} />
         <Row label="Does this use client data?" value={sub.s6.clientData} />
-        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Regulatory exposure</div>
+        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em" }}>Regulatory exposure</div>
           <Tags items={sub.s6.regs} />
         </div>
         <Row label="Model risk classification" value={sub.s6.modelRisk} />
         <Row label="Legal review required?" value={sub.s6.legalNeeded} />
-        {sub.s6.legalNeeded === "Yes" && <>
-          <Row label="Legal review status" value={sub.s6.legalStatus} />
-          <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-            <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Legal areas involved</div>
+        {sub.s6.legalNeeded === "Yes" && <Row label="Legal review status" value={sub.s6.legalStatus} />}
+        {sub.s6.legalNeeded === "Yes" && (
+          <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+            <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em" }}>Legal areas</div>
             <Tags items={sub.s6.legalAreas} />
           </div>
-        </>}
+        )}
         <Row label="Known risks / concerns" value={sub.s6.risks} />
-      </Section>
+      </Sec>
 
-      <Section title="Step 7 — Team & resources">
-        <div style={ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
-          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }>Core team</div>
-          <div style={ display:"grid", gridTemplateColumns:"1fr 1fr 80px", gap:8 }>
-            {["Role","Name / Team","% allocated"].map(h => (
-              <div key={h} style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>{h}</div>
-            ))}
-            {sub.s7.team.map((t,i) => (
-              <>
-                <div key={"tr"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{t.role}</div>
-                <div key={"tn"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{t.name}</div>
-                <div key={"tp"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{t.pct}%</div>
-              </>
-            ))}
+      <Sec title="Step 7 — Team & resources">
+        {sub.s7.team && sub.s7.team.length > 0 && (
+          <div style={{ padding:"10px 0", borderBottom:"1px solid " + C.mist }}>
+            <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Core team</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 80px", gap:8 }}>
+              {["Role","Name / Team","% allocated"].map(h => <div key={h} style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase" }}>{h}</div>)}
+              {sub.s7.team.map((t,i) => [
+                <div key={"r"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{t.role}</div>,
+                <div key={"n"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{t.name}</div>,
+                <div key={"p"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{t.pct}%</div>,
+              ])}
+            </div>
           </div>
-        </div>
+        )}
         <Row label="Resource constraints / blockers" value={sub.s7.constraints} />
         <Row label="Additional notes for AI CoE" value={sub.s7.notes} />
-        <div style={ marginTop:16, padding:"14px 18px", background:C.mist, borderRadius:10, border:`1px solid ${C.mistDark}` }>
-          <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }>Submission summary</div>
-          <div style={ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 24px", fontSize:13 }>
-            <div><span style={ color:C.textLight }>Initiative: </span><span style={ fontWeight:600 }>{sub.s1.name}</span></div>
-            <div><span style={ color:C.textLight }>Use case ID: </span><span style={ fontFamily:"monospace", fontWeight:700 }>{sub.id}</span></div>
-            <div><span style={ color:C.textLight }>Business line: </span><span>{sub.s1.businessLine}</span></div>
-            <div><span style={ color:C.textLight }>Vendor: </span><span>{sub.s1.vendor}</span></div>
-            <div><span style={ color:C.textLight }>Total cost: </span><span>{fmt(sub.s4.totalCost)}</span></div>
-            <div><span style={ color:C.textLight }>Annual value: </span><span style={ fontWeight:700 }>{fmt(sub.s4.annualValue)}</span></div>
-          </div>
-        </div>
-      </Section>
-
+      </Sec>
     </div>
   );
 }
 
+function mapRow(r) {
+  const f = v => v ? "$" + Number(v).toLocaleString() : "—";
+  function buildCalc(r) {
+    const rt = r.return_type;
+    if(rt==="Cost savings") return [
+      {label:"FTE redeployment",a:r.cost_ftes?r.cost_ftes+" FTEs":"—",subtotal:r.cost_ftes&&r.cost_time_pct&&r.cost_salary?f(r.cost_ftes*(r.cost_time_pct/100)*r.cost_salary)+"/yr":"—"},
+      {label:"Licenses eliminated",a:r.cost_licenses?r.cost_licenses+" licenses":"—",subtotal:r.cost_licenses&&r.cost_license_amt?f(r.cost_licenses*r.cost_license_amt)+"/yr":"—"},
+      {label:"Infrastructure",a:"—",subtotal:r.cost_infra?f(r.cost_infra)+"/yr":"—"},
+    ];
+    if(rt==="Efficiency / productivity") return [
+      {label:"Hours saved / week",a:r.eff_hrs?r.eff_hrs+" hrs":"—",b:r.eff_rate?f(r.eff_rate)+"/hr":"—",subtotal:r.eff_hrs&&r.eff_rate?f(r.eff_hrs*52*r.eff_rate)+"/yr":"—"},
+      {label:"Errors / month",a:r.eff_errors?r.eff_errors+" errors":"—",subtotal:r.eff_errors&&r.eff_error_cost?f(r.eff_errors*12*r.eff_error_cost)+"/yr":"—"},
+      {label:"Queries deflected",a:r.eff_queries?r.eff_queries+" queries":"—",subtotal:r.eff_queries&&r.eff_query_cost?f(r.eff_queries*12*r.eff_query_cost)+"/yr":"—"},
+    ];
+    if(rt==="Risk reduction") return [
+      {label:"Incident avoidance",a:r.risk_prob?r.risk_prob+"% prob":"—",subtotal:r.risk_prob&&r.risk_incident?f((r.risk_prob/100)*r.risk_incident)+"/yr":"—"},
+      {label:"Regulatory fine",a:r.risk_fine_likely?r.risk_fine_likely+"% likelihood":"—",subtotal:r.risk_fine&&r.risk_fine_likely?f(r.risk_fine*(r.risk_fine_likely/100))+"/yr":"—"},
+    ];
+    return [];
+  }
+  return {
+    id: r.use_case_id, stage: r.stage, submittedDate: r.submitted_date, raw: r,
+    composite_score: r.composite_score, recommendation: r.recommendation,
+    score_rationale: r.score_rationale, score_flags: r.score_flags,
+    score_summary: r.score_summary, scored_at: r.scored_at,
+    score_strategic_fit: r.score_strategic_fit, score_expected_impact: r.score_expected_impact,
+    score_feasibility: r.score_feasibility, score_cost: r.score_cost,
+    score_resource: r.score_resource, score_risk: r.score_risk,
+    s1:{ name:r.name, businessLine:r.business_line, team:r.team, sponsor:r.sponsor, owner:r.owner, startDate:r.start_date, goLiveDate:r.go_live_date, vendor:r.vendor },
+    s2:{ problem:r.problem, adopters:r.adopters, whyNow:r.why_now, inaction:r.inaction, problemTypes:r.problem_types||[] },
+    s3:{ pillars:r.pillars||[], howAligned:r.how_aligned, roadmap:r.roadmap, dependencies:r.dependencies },
+    s4:{ totalCost:r.total_cost, confidence:r.cost_confidence, buildCost:r.build_cost, licenseCost:r.license_cost, runCost:r.run_cost, returnType:r.return_type, annualValue:r.annual_value, payback:r.payback_months, calcInputs:buildCalc(r) },
+    s5:{ kpiCats:r.kpi_cats||[], kpis:r.kpis||[], measureMethod:r.measure_method, realizationOwner:r.realization_owner, success90:r.success_90, success12mo:r.success_12mo, uxMethods:r.ux_methods||[] },
+    s6:{ dataClass:r.data_class, clientData:r.client_data, regs:r.regs||[], modelRisk:r.model_risk, legalNeeded:r.legal_needed, legalStatus:r.legal_status, legalAreas:r.legal_areas||[], risks:r.risks },
+    s7:{ team:r.team_members||[], constraints:r.constraints, notes:r.notes },
+  };
+}
+
 function ARIARepository() {
-  const [allSubmissions, setAllSubmissions] = useState(SUBMISSIONS);
+  const [subs, setSubs] = useState(HARDCODED);
+  const [selected, setSelected] = useState(HARDCODED[0]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(null);
-  const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState("All");
   const [rescoring, setRescoring] = useState(false);
 
   useEffect(() => {
-    fetchSubmissions()
+    sbFetch()
       .then(rows => {
         const live = rows.map(mapRow);
         const liveIds = new Set(live.map(r => r.id));
-        const merged = [...live, ...SUBMISSIONS.filter(s => !liveIds.has(s.id))];
-        setAllSubmissions(merged);
+        const merged = [...live, ...HARDCODED.filter(s => !liveIds.has(s.id))];
+        setSubs(merged);
         setSelected(merged[0] || null);
       })
-      .catch(e => setFetchError(e.message))
+      .catch(e => console.error("Fetch error:", e))
       .finally(() => setLoading(false));
   }, []);
 
   async function handleRescore(sub) {
     setRescoring(true);
     try {
-      const scores = await scoreWithClaude(sub.raw || sub);
-      await patchSupabase(sub.id, { ...scores, scored_at: new Date().toISOString() });
-      const updated = { ...sub, ...scores };
-      setAllSubmissions(prev => prev.map(s => s.id === sub.id ? updated : s));
+      const data = sub.raw || sub;
+      const scores = await callClaude(data);
+      const patch = { ...scores, scored_at: new Date().toISOString() };
+      await sbPatch(sub.id, patch);
+      const updated = { ...sub, ...patch };
+      setSubs(prev => prev.map(s => s.id === sub.id ? updated : s));
       setSelected(updated);
     } catch(e) { alert("Rescore failed: " + e.message); }
     finally { setRescoring(false); }
   }
-  const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState("All");
 
-  const stages = ["All", ...Array.from(new Set(allSubmissions.map(s => s.stage)))];
-
-  const filtered = allSubmissions.filter(s => {
+  const stages = ["All", ...Array.from(new Set(subs.map(s => s.stage)))];
+  const filtered = subs.filter(s => {
     const q = search.toLowerCase();
     const matchSearch = !q || s.s1.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.s1.businessLine.toLowerCase().includes(q);
     const matchStage = stageFilter === "All" || s.stage === stageFilter;
@@ -780,81 +472,64 @@ function ARIARepository() {
   });
 
   return (
-    <div style={ fontFamily:"'DM Sans','Nunito',system-ui,sans-serif", background:C.mist, height:"100vh", display:"flex", flexDirection:"column" }>
+    <div style={{ fontFamily:"'DM Sans','Nunito',system-ui,sans-serif", background:C.mist, height:"100vh", display:"flex", flexDirection:"column" }}>
 
-      <div style={ background:"#1a1a1a", padding:"0 28px", flexShrink:0 }>
-        <div style={ display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }>
-          <div style={ display:"flex", alignItems:"center", gap:10 }>
-            <div style={ width:26, height:26, borderRadius:7, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:"#fff" }>A</div>
-            <span style={ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }>ARIA</span>
-            <span style={ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }>·</span>
-            <span style={ fontSize:13, color:"rgba(255,255,255,0.55)" }>Use case repository</span>
+      <div style={{ background:"#1a1a1a", padding:"0 28px", flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:26, height:26, borderRadius:7, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:"#fff" }}>A</div>
+            <span style={{ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }}>ARIA</span>
+            <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }}>·</span>
+            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>Use case repository</span>
           </div>
-          <div style={ display:"flex", alignItems:"center", gap:8 }>
-            <span style={ fontSize:12, color:"rgba(255,255,255,0.5)" }>{SUBMISSIONS.length} submissions</span>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            {loading && <span style={{ fontSize:12, color:"rgba(255,255,255,0.4)" }}>Loading...</span>}
+            <span style={{ fontSize:12, color:"rgba(255,255,255,0.5)" }}>{subs.length} submissions</span>
+            <a href="index.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>+ New intake</a>
           </div>
         </div>
       </div>
 
-      <div style={ display:"flex", flex:1, overflow:"hidden" }>
+      <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
 
-        <div style={ width:340, flexShrink:0, borderRight:`1px solid ${C.border}`, background:C.white, display:"flex", flexDirection:"column", overflow:"hidden" }>
-
-          <div style={ padding:"14px 16px", borderBottom:`1px solid ${C.mistDark}`, flexShrink:0 }>
-            <input
-              type="text"
-              placeholder="Search by name or ID..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={ width:"100%", fontSize:13, padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:8, fontFamily:"inherit", color:C.text, background:C.mist, outline:"none", boxSizing:"border-box" }
-            />
-            <div style={ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }>
+        <div style={{ width:340, flexShrink:0, borderRight:"1px solid " + C.border, background:C.white, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+          <div style={{ padding:"14px 16px", borderBottom:"1px solid " + C.mistDark, flexShrink:0 }}>
+            <input type="text" placeholder="Search by name, ID, or business line..." value={search} onChange={e => setSearch(e.target.value)} style={{ width:"100%", fontSize:13, padding:"8px 10px", border:"1px solid " + C.border, borderRadius:8, fontFamily:"inherit", color:C.text, background:C.mist, outline:"none", boxSizing:"border-box" }} />
+            <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
               {stages.map(s => (
-                <button key={s} onClick={() => setStageFilter(s)} style={
-                  padding:"3px 10px", fontSize:11, borderRadius:99, cursor:"pointer", fontFamily:"inherit", fontWeight:600,
-                  border: stageFilter===s ? "1.5px solid #333" : `1px solid ${C.border}`,
-                  background: stageFilter===s ? "#1a1a1a" : C.white,
-                  color: stageFilter===s ? "#fff" : C.textMid,
-                }>{s}</button>
+                <button key={s} onClick={() => setStageFilter(s)} style={{ padding:"3px 10px", fontSize:11, borderRadius:99, cursor:"pointer", fontFamily:"inherit", fontWeight:600, border:stageFilter===s?"1.5px solid #333":"1px solid " + C.border, background:stageFilter===s?"#1a1a1a":C.white, color:stageFilter===s?"#fff":C.textMid }}>{s}</button>
               ))}
             </div>
           </div>
 
-          <div style={ overflowY:"auto", flex:1 }>
-            {filtered.length === 0 && (
-              <div style={ padding:24, fontSize:13, color:C.textLight, textAlign:"center" }>No submissions match your search.</div>
-            )}
+          <div style={{ overflowY:"auto", flex:1 }}>
+            {filtered.length === 0 && <div style={{ padding:24, fontSize:13, color:C.textLight, textAlign:"center" }}>No submissions match your search.</div>}
             {filtered.map(sub => (
-              <div key={sub.id} onClick={() => setSelected(sub)} style={
-                padding:"14px 16px", borderBottom:`1px solid ${C.mistDark}`, cursor:"pointer",
-                background: selected?.id === sub.id ? "#f7f7f7" : C.white,
-                borderLeft: selected?.id === sub.id ? "3px solid #1a1a1a" : "3px solid transparent",
-              }>
-                <div style={ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }>
-                  <div style={ fontSize:13, fontWeight:700, color:C.navy, lineHeight:1.4, flex:1, paddingRight:8 }>{sub.s1.name}</div>
+              <div key={sub.id} onClick={() => setSelected(sub)} style={{ padding:"14px 16px", borderBottom:"1px solid " + C.mistDark, cursor:"pointer", background:selected && selected.id === sub.id ? "#f7f7f7" : C.white, borderLeft:selected && selected.id === sub.id ? "3px solid #1a1a1a" : "3px solid transparent" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:C.navy, lineHeight:1.4, flex:1, paddingRight:8 }}>{sub.s1.name}</div>
                   <StageBadge stage={sub.stage} />
                 </div>
-                <div style={ fontSize:11, fontFamily:"monospace", color:C.textLight, marginBottom:4 }>{sub.id}</div>
-                <div style={ fontSize:12, color:C.textMid }>{sub.s1.businessLine} · {sub.s1.team}</div>
-                <div style={ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }>
-                  {sub.recommendation && (() => {
-                    const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c"},Review:{bg:"#fff8e0",color:"#a06000"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a"}[sub.recommendation]||{bg:"#eee",color:"#555"};
-                    return <span style={fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:rc.bg,color:rc.color}>{sub.recommendation}</span>;
-                  })()}
-                  {sub.composite_score && <span style={fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"#f0f0f0",color:"#333"}>{sub.composite_score}/100</span>}
-                </div>
-                <div style={ display:"flex", gap:16, marginTop:8 }>
+                <div style={{ fontSize:11, fontFamily:"monospace", color:C.textLight, marginBottom:4 }}>{sub.id}</div>
+                <div style={{ fontSize:12, color:C.textMid, marginBottom:6 }}>{sub.s1.businessLine} · {sub.s1.team}</div>
+                {(sub.recommendation || sub.composite_score) && (
+                  <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+                    {sub.recommendation && <RecBadge rec={sub.recommendation} />}
+                    {sub.composite_score && <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, background:"#f0f0f0", color:"#555" }}>{sub.composite_score}/100</span>}
+                  </div>
+                )}
+                <div style={{ display:"flex", gap:16 }}>
                   <div>
-                    <div style={ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }>Cost</div>
-                    <div style={ fontSize:12, fontWeight:600, color:C.navy }>{fmt(sub.s4.totalCost)}</div>
+                    <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Cost</div>
+                    <div style={{ fontSize:12, fontWeight:600, color:C.navy }}>{fmt(sub.s4.totalCost)}</div>
                   </div>
                   <div>
-                    <div style={ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }>Annual value</div>
-                    <div style={ fontSize:12, fontWeight:600, color:C.navy }>{fmt(sub.s4.annualValue)}</div>
+                    <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Annual value</div>
+                    <div style={{ fontSize:12, fontWeight:600, color:C.navy }}>{fmt(sub.s4.annualValue)}</div>
                   </div>
                   <div>
-                    <div style={ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }>Vendor</div>
-                    <div style={ fontSize:12, color:C.textMid }>{sub.s1.vendor.split(" ")[0]}</div>
+                    <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Vendor</div>
+                    <div style={{ fontSize:12, color:C.textMid }}>{sub.s1.vendor ? sub.s1.vendor.split(" ")[0] : "—"}</div>
                   </div>
                 </div>
               </div>
@@ -862,19 +537,17 @@ function ARIARepository() {
           </div>
         </div>
 
-        <div style={ flex:1, overflowY:"auto", background:"#fafafa" }>
-          {selected ? <DetailPanel sub={selected} /> : (
-            <div style={ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", color:C.textLight, fontSize:14 }>
-              Select a submission to view details
-            </div>
-          )}
+        <div style={{ flex:1, overflowY:"auto", background:"#fafafa" }}>
+          {selected
+            ? <DetailPanel sub={selected} onRescore={() => handleRescore(selected)} rescoring={rescoring} />
+            : <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", color:C.textLight, fontSize:14 }}>Select a submission to view details</div>
+          }
         </div>
 
       </div>
     </div>
   );
 }
-
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(ARIARepository));
