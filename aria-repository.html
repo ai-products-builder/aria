@@ -19,7 +19,122 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="text/babel">
-const { useState } = React;
+const { useState, useEffect } = React;
+
+const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
+
+async function fetchSubmissions() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/aria_usecases?select=*&order=submitted_date.desc`,
+    {
+      headers: {
+        "apikey": SUPABASE_KEY,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+      },
+    }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// Map flat Supabase row → nested structure used by DetailPanel
+function mapRow(r) {
+  return {
+    id: r.use_case_id,
+    stage: r.stage,
+    submittedDate: r.submitted_date,
+    s1: {
+      name: r.name,
+      businessLine: r.business_line,
+      team: r.team,
+      sponsor: r.sponsor,
+      owner: r.owner,
+      startDate: r.start_date,
+      goLiveDate: r.go_live_date,
+      vendor: r.vendor,
+      otherVendor: r.other_vendor,
+    },
+    s2: {
+      problem: r.problem,
+      adopters: r.adopters,
+      whyNow: r.why_now,
+      inaction: r.inaction,
+      problemTypes: r.problem_types || [],
+    },
+    s3: {
+      pillars: r.pillars || [],
+      howAligned: r.how_aligned,
+      roadmap: r.roadmap,
+      dependencies: r.dependencies,
+    },
+    s4: {
+      totalCost: r.total_cost,
+      confidence: r.cost_confidence,
+      buildCost: r.build_cost,
+      licenseCost: r.license_cost,
+      runCost: r.run_cost,
+      returnType: r.return_type,
+      calcInputs: buildCalcInputs(r),
+      annualValue: r.annual_value,
+      payback: r.payback_months,
+    },
+    s5: {
+      kpiCats: r.kpi_cats || [],
+      kpis: r.kpis || [],
+      measureMethod: r.measure_method,
+      realizationOwner: r.realization_owner,
+      success90: r.success_90,
+      success12mo: r.success_12mo,
+      uxMethods: r.ux_methods || [],
+    },
+    s6: {
+      dataClass: r.data_class,
+      clientData: r.client_data,
+      regs: r.regs || [],
+      modelRisk: r.model_risk,
+      legalNeeded: r.legal_needed,
+      legalStatus: r.legal_status,
+      legalAreas: r.legal_areas || [],
+      risks: r.risks,
+    },
+    s7: {
+      team: r.team_members || [],
+      constraints: r.constraints,
+      notes: r.notes,
+    },
+  };
+}
+
+function buildCalcInputs(r) {
+  const fmt = v => v ? "$" + Number(v).toLocaleString() : "—";
+  const rt = r.return_type;
+  if (rt === "Cost savings") return [
+    { label: "FTE redeployment", a: r.cost_ftes ? r.cost_ftes + " FTEs" : "—", subtotal: r.cost_ftes && r.cost_time_pct && r.cost_salary ? fmt(r.cost_ftes*(r.cost_time_pct/100)*r.cost_salary)+"/yr" : "—" },
+    { label: "Licenses eliminated", a: r.cost_licenses ? r.cost_licenses + " licenses" : "—", subtotal: r.cost_licenses && r.cost_license_amt ? fmt(r.cost_licenses*r.cost_license_amt)+"/yr" : "—" },
+    { label: "Infrastructure reduction", a: "—", subtotal: r.cost_infra ? fmt(r.cost_infra)+"/yr" : "—" },
+  ];
+  if (rt === "Efficiency / productivity") return [
+    { label: "Hours saved / week", a: r.eff_hrs ? r.eff_hrs + " hrs" : "—", b: r.eff_rate ? fmt(r.eff_rate)+"/hr" : "—", subtotal: r.eff_hrs && r.eff_rate ? fmt(r.eff_hrs*52*r.eff_rate)+"/yr" : "—" },
+    { label: "Errors reduced / month", a: r.eff_errors ? r.eff_errors + " errors" : "—", b: r.eff_error_cost ? fmt(r.eff_error_cost)+"/error" : "—", subtotal: r.eff_errors && r.eff_error_cost ? fmt(r.eff_errors*12*r.eff_error_cost)+"/yr" : "—" },
+    { label: "Queries deflected / month", a: r.eff_queries ? r.eff_queries + " queries" : "—", b: r.eff_query_cost ? fmt(r.eff_query_cost)+"/query" : "—", subtotal: r.eff_queries && r.eff_query_cost ? fmt(r.eff_queries*12*r.eff_query_cost)+"/yr" : "—" },
+  ];
+  if (rt === "Revenue generation") return [
+    { label: "New deals", a: r.rev_deals ? r.rev_deals + " deals/yr" : "—", subtotal: r.rev_deals && r.rev_deal_value ? fmt(r.rev_deals*r.rev_deal_value)+"/yr" : "—" },
+    { label: "Conversion lift", a: r.rev_lift ? r.rev_lift + "%" : "—", subtotal: r.rev_lift && r.rev_base ? fmt((r.rev_lift/100)*r.rev_base)+"/yr" : "—" },
+  ];
+  if (rt === "Risk reduction") return [
+    { label: "Incident avoidance", a: r.risk_prob ? r.risk_prob + "% probability" : "—", subtotal: r.risk_prob && r.risk_incident ? fmt((r.risk_prob/100)*r.risk_incident)+"/yr" : "—" },
+    { label: "Regulatory fine", a: r.risk_fine_likely ? r.risk_fine_likely + "% likelihood" : "—", subtotal: r.risk_fine && r.risk_fine_likely ? fmt(r.risk_fine*(r.risk_fine_likely/100))+"/yr" : "—" },
+  ];
+  if (rt === "Mixed (multiple types)") return [
+    { label: "Cost savings", a: "—", subtotal: r.mix_cost ? fmt(r.mix_cost) : "—" },
+    { label: "Efficiency gains", a: "—", subtotal: r.mix_eff ? fmt(r.mix_eff) : "—" },
+    { label: "Revenue generated", a: "—", subtotal: r.mix_rev ? fmt(r.mix_rev) : "—" },
+    { label: "Risk avoided", a: "—", subtotal: r.mix_risk ? fmt(r.mix_risk) : "—" },
+  ];
+  return [];
+}
 
 const C = {
   navy: "#1a1a1a",
@@ -572,13 +687,30 @@ function DetailPanel({ sub }) {
 }
 
 function ARIARepository() {
-  const [selected, setSelected] = useState(SUBMISSIONS[0]);
+  const [allSubmissions, setAllSubmissions] = useState(SUBMISSIONS);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    fetchSubmissions()
+      .then(rows => {
+        const live = rows.map(mapRow);
+        // Merge: live Supabase rows first, then hardcoded samples not already in live
+        const liveIds = new Set(live.map(r => r.id));
+        const merged = [...live, ...SUBMISSIONS.filter(s => !liveIds.has(s.id))];
+        setAllSubmissions(merged);
+        setSelected(merged[0] || null);
+      })
+      .catch(e => setFetchError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
 
-  const stages = ["All", ...Array.from(new Set(SUBMISSIONS.map(s => s.stage)))];
+  const stages = ["All", ...Array.from(new Set(allSubmissions.map(s => s.stage)))];
 
-  const filtered = SUBMISSIONS.filter(s => {
+  const filtered = allSubmissions.filter(s => {
     const q = search.toLowerCase();
     const matchSearch = !q || s.s1.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.s1.businessLine.toLowerCase().includes(q);
     const matchStage = stageFilter === "All" || s.stage === stageFilter;
