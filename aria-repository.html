@@ -474,18 +474,18 @@ function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
 function StageBadge({ stage }) {
   const s = STAGE_COLORS[stage] || STAGE_COLORS["Ideation"];
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:s.bg, color:s.color, border:`1px solid ${s.border}`, whiteSpace:"nowrap" }}>
+    <span style={ display:"inline-flex", alignItems:"center", padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:s.bg, color:s.color, border:`1px solid ${s.border}`, whiteSpace:"nowrap" }>
       {stage}
     </span>
   );
 }
 
 function Tags({ items }) {
-  if (!items || items.length === 0) return <span style={{ color: C.textLight, fontSize: 13 }}>—</span>;
+  if (!items || items.length === 0) return <span style={ color: C.textLight, fontSize: 13 }>—</span>;
   return (
-    <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:4 }}>
+    <div style={ display:"flex", flexWrap:"wrap", gap:6, marginTop:4 }>
       {items.map(t => (
-        <span key={t} style={{ padding:"3px 10px", borderRadius:99, fontSize:12, background:"#f0f0f0", color:"#444", border:"1px solid #ddd" }}>{t}</span>
+        <span key={t} style={ padding:"3px 10px", borderRadius:99, fontSize:12, background:"#f0f0f0", color:"#444", border:"1px solid #ddd" }>{t}</span>
       ))}
     </div>
   );
@@ -493,20 +493,20 @@ function Tags({ items }) {
 
 function Row({ label, value, mono }) {
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-      <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>{label}</div>
-      <div style={{ fontSize:13, color:C.text, lineHeight:1.6, fontFamily: mono ? "monospace" : "inherit", whiteSpace:"pre-wrap" }}>{value || "—"}</div>
+    <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+      <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>{label}</div>
+      <div style={ fontSize:13, color:C.text, lineHeight:1.6, fontFamily: mono ? "monospace" : "inherit", whiteSpace:"pre-wrap" }>{value || "—"}</div>
     </div>
   );
 }
 
 function Section({ title, children }) {
   return (
-    <div style={{ marginBottom:28 }}>
-      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
-        <div style={{ width:3, height:16, borderRadius:99, background:"#333", flexShrink:0 }} />
-        <span style={{ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#555" }}>{title}</span>
-        <div style={{ flex:1, height:1, background:C.mistDark }} />
+    <div style={ marginBottom:28 }>
+      <div style={ display:"flex", alignItems:"center", gap:10, marginBottom:12 }>
+        <div style={ width:3, height:16, borderRadius:99, background:"#333", flexShrink:0 } />
+        <span style={ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", color:"#555" }>{title}</span>
+        <div style={ flex:1, height:1, background:C.mistDark } />
       </div>
       {children}
     </div>
@@ -517,33 +517,33 @@ function DetailPanel({ sub }) {
   const av = sub.s4.annualValue;
   const tc = sub.s4.totalCost;
   return (
-    <div style={{ padding:"28px 32px", overflowY:"auto", height:"100%", boxSizing:"border-box" }}>
+    <div style={ padding:"28px 32px", overflowY:"auto", height:"100%", boxSizing:"border-box" }>
 
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, flexWrap:"wrap", gap:12 }}>
+      <div style={ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, flexWrap:"wrap", gap:12 }>
         <div>
-          <div style={{ fontSize:20, fontWeight:800, color:C.navy, marginBottom:4 }}>{sub.s1.name}</div>
-          <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+          <div style={ fontSize:20, fontWeight:800, color:C.navy, marginBottom:4 }>{sub.s1.name}</div>
+          <div style={ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }>
             <StageBadge stage={sub.stage} />
-            <span style={{ fontSize:12, fontFamily:"monospace", color:C.textLight }}>{sub.id}</span>
-            <span style={{ fontSize:12, color:C.textLight }}>Submitted {sub.submittedDate}</span>
+            <span style={ fontSize:12, fontFamily:"monospace", color:C.textLight }>{sub.id}</span>
+            <span style={ fontSize:12, color:C.textLight }>Submitted {sub.submittedDate}</span>
           </div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, minWidth:300 }}>
+        <div style={ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, minWidth:300 }>
           {[
             { label:"Total cost", value: fmt(tc) },
             { label:"Annual value", value: fmt(av) },
             { label:"Payback", value: sub.s4.payback ? sub.s4.payback + " mo" : "—" },
           ].map(m => (
-            <div key={m.label} style={{ background:C.mist, borderRadius:8, padding:"10px 14px" }}>
-              <div style={{ fontSize:11, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>{m.label}</div>
-              <div style={{ fontSize:16, fontWeight:700, color:C.navy }}>{m.value}</div>
+            <div key={m.label} style={ background:C.mist, borderRadius:8, padding:"10px 14px" }>
+              <div style={ fontSize:11, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }>{m.label}</div>
+              <div style={ fontSize:16, fontWeight:700, color:C.navy }>{m.value}</div>
             </div>
           ))}
         </div>
       </div>
 
       {sub.recommendation && (() => {
-        const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c",border:"#a0d4b0"},Review:{bg:"#fff8e0",color:"#a06000",border:"#f0d080"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a",border:"#f0a0a0"}}[sub.recommendation]||{bg:"#f0f0f0",color:"#555",border:"#ccc"};
+        const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c",border:"#a0d4b0"},Review:{bg:"#fff8e0",color:"#a06000",border:"#f0d080"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a",border:"#f0a0a0"}[sub.recommendation]||{bg:"#f0f0f0",color:"#555",border:"#ccc"};
         const dims = [
           {label:"Strategic fit", score:sub.score_strategic_fit, note:sub.score_rationale?.strategic_fit},
           {label:"Expected impact", score:sub.score_expected_impact, note:sub.score_rationale?.expected_impact},
@@ -553,42 +553,42 @@ function DetailPanel({ sub }) {
           {label:"Risk", score:sub.score_risk, note:sub.score_rationale?.risk},
         ];
         return (
-          <div style={{marginBottom:28}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
-              <div style={{width:3,height:16,borderRadius:99,background:"#333",flexShrink:0}} />
-              <span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#555"}}>AI CoE Prioritization Score</span>
-              <div style={{flex:1,height:1,background:"#e0e0e0"}} />
-              <button onClick={()=>handleRescore(sub)} disabled={rescoring} style={{fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontFamily:"inherit",color:"#333"}}>{rescoring?"Scoring...":"Re-score"}</button>
-              <a href={`index.html?edit=${sub.id}`} style={{fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #1a1a1a",background:"#1a1a1a",cursor:"pointer",fontFamily:"inherit",color:"#fff",textDecoration:"none"}}>Edit</a>
+          <div style={marginBottom:28}>
+            <div style={display:"flex",alignItems:"center",gap:10,marginBottom:12}>
+              <div style={width:3,height:16,borderRadius:99,background:"#333",flexShrink:0} />
+              <span style={fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#555"}>AI CoE Prioritization Score</span>
+              <div style={flex:1,height:1,background:"#e0e0e0"} />
+              <button onClick={()=>handleRescore(sub)} disabled={rescoring} style={fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontFamily:"inherit",color:"#333"}>{rescoring?"Scoring...":"Re-score"}</button>
+              <a href={`index.html?edit=${sub.id}`} style={fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #1a1a1a",background:"#1a1a1a",cursor:"pointer",fontFamily:"inherit",color:"#fff",textDecoration:"none"}>Edit</a>
             </div>
-            <div style={{padding:"14px 18px",background:rc.bg,border:`1px solid ${rc.border}`,borderRadius:12,marginBottom:12}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:11,fontWeight:700,color:rc.color,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recommendation</span>
-                <div style={{display:"flex",alignItems:"baseline",gap:12}}>
-                  <span style={{fontSize:22,fontWeight:800,color:"#1a1a1a"}}>{sub.composite_score}<span style={{fontSize:12,color:"#999",fontWeight:400}}>/100</span></span>
-                  <span style={{fontSize:14,fontWeight:700,color:rc.color}}>{sub.recommendation}</span>
+            <div style={padding:"14px 18px",background:rc.bg,border:`1px solid ${rc.border}`,borderRadius:12,marginBottom:12}>
+              <div style={display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}>
+                <span style={fontSize:11,fontWeight:700,color:rc.color,textTransform:"uppercase",letterSpacing:"0.06em"}>Recommendation</span>
+                <div style={display:"flex",alignItems:"baseline",gap:12}>
+                  <span style={fontSize:22,fontWeight:800,color:"#1a1a1a"}>{sub.composite_score}<span style={fontSize:12,color:"#999",fontWeight:400}>/100</span></span>
+                  <span style={fontSize:14,fontWeight:700,color:rc.color}>{sub.recommendation}</span>
                 </div>
               </div>
-              <div style={{fontSize:13,color:"#555",lineHeight:1.6}}>{sub.score_summary}</div>
+              <div style={fontSize:13,color:"#555",lineHeight:1.6}>{sub.score_summary}</div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+            <div style={display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}>
               {dims.map(d=>(
-                <div key={d.label} style={{padding:"8px 10px",background:"#f5f5f5",borderRadius:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                    <span style={{fontSize:11,fontWeight:600,color:"#888"}}>{d.label}</span>
-                    <span style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{d.score}/5</span>
+                <div key={d.label} style={padding:"8px 10px",background:"#f5f5f5",borderRadius:8}>
+                  <div style={display:"flex",justifyContent:"space-between",marginBottom:3}>
+                    <span style={fontSize:11,fontWeight:600,color:"#888"}>{d.label}</span>
+                    <span style={fontSize:13,fontWeight:700,color:"#1a1a1a"}>{d.score}/5</span>
                   </div>
-                  <div style={{fontSize:11,color:"#999",lineHeight:1.4}}>{d.note}</div>
+                  <div style={fontSize:11,color:"#999",lineHeight:1.4}>{d.note}</div>
                 </div>
               ))}
             </div>
             {sub.score_flags && sub.score_flags.length > 0 && (
-              <div style={{padding:"8px 12px",background:"#fff8e0",border:"1px solid #f0d080",borderRadius:8}}>
-                <div style={{fontSize:10,fontWeight:700,color:"#a06000",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Flags</div>
-                {sub.score_flags.map((f,i)=><div key={i} style={{fontSize:12,color:"#7a4d00"}}>• {f}</div>)}
+              <div style={padding:"8px 12px",background:"#fff8e0",border:"1px solid #f0d080",borderRadius:8}>
+                <div style={fontSize:10,fontWeight:700,color:"#a06000",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}>Flags</div>
+                {sub.score_flags.map((f,i)=><div key={i} style={fontSize:12,color:"#7a4d00"}>• {f}</div>)}
               </div>
             )}
-            {sub.scored_at && <div style={{fontSize:11,color:"#bbb",marginTop:6,textAlign:"right"}}>Scored {new Date(sub.scored_at).toLocaleString()}</div>}
+            {sub.scored_at && <div style={fontSize:11,color:"#bbb",marginTop:6,textAlign:"right"}>Scored {new Date(sub.scored_at).toLocaleString()}</div>}
           </div>
         );
       })()}
@@ -609,15 +609,15 @@ function DetailPanel({ sub }) {
         <Row label="How many people will adopt this?" value={sub.s2.adopters} />
         <Row label="Why now?" value={sub.s2.whyNow} />
         <Row label="What happens if we don't act?" value={sub.s2.inaction} />
-        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>Problem type</div>
+        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Problem type</div>
           <Tags items={sub.s2.problemTypes} />
         </div>
       </Section>
 
       <Section title="Step 3 — Strategic alignment">
-        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>Strategic pillars</div>
+        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Strategic pillars</div>
           <Tags items={sub.s3.pillars} />
         </div>
         <Row label="How does this support the pillar?" value={sub.s3.howAligned} />
@@ -632,17 +632,17 @@ function DetailPanel({ sub }) {
         <Row label="Licensing / vendor cost" value={fmt(sub.s4.licenseCost)} />
         <Row label="Annual run cost" value={fmt(sub.s4.runCost)} />
         <Row label="Primary return type" value={sub.s4.returnType} />
-        <div style={{ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Calculator inputs</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }}>Line item</div>
-            <div style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }}>Input A</div>
-            <div style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }}>Input B / Subtotal</div>
+        <div style={ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }>Calculator inputs</div>
+          <div style={ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }>
+            <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>Line item</div>
+            <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>Input A</div>
+            <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>Input B / Subtotal</div>
             {sub.s4.calcInputs.map((r,i) => (
               <>
-                <div key={"a"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{r.label}</div>
-                <div key={"b"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{r.a || "—"}</div>
-                <div key={"c"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{r.subtotal || r.b || "—"}</div>
+                <div key={"a"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{r.label}</div>
+                <div key={"b"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{r.a || "—"}</div>
+                <div key={"c"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{r.subtotal || r.b || "—"}</div>
               </>
             ))}
           </div>
@@ -652,22 +652,22 @@ function DetailPanel({ sub }) {
       </Section>
 
       <Section title="Step 5 — KPIs & success metrics">
-        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>KPI categories</div>
+        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>KPI categories</div>
           <Tags items={sub.s5.kpiCats} />
         </div>
-        <div style={{ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>KPI targets</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 100px 80px 80px", gap:8 }}>
+        <div style={ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }>KPI targets</div>
+          <div style={ display:"grid", gridTemplateColumns:"1fr 100px 80px 80px", gap:8 }>
             {["KPI","Unit","Baseline","Target"].map(h => (
-              <div key={h} style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }}>{h}</div>
+              <div key={h} style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>{h}</div>
             ))}
             {sub.s5.kpis.map((k,i) => (
               <>
-                <div key={"kn"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{k.name}</div>
-                <div key={"ku"+i} style={{ fontSize:13, color:C.textMid, padding:"4px 0" }}>{k.unit}</div>
-                <div key={"kb"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{k.baseline}</div>
-                <div key={"kt"+i} style={{ fontSize:13, fontWeight:600, color:C.navy, padding:"4px 0" }}>{k.target}</div>
+                <div key={"kn"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{k.name}</div>
+                <div key={"ku"+i} style={ fontSize:13, color:C.textMid, padding:"4px 0" }>{k.unit}</div>
+                <div key={"kb"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{k.baseline}</div>
+                <div key={"kt"+i} style={ fontSize:13, fontWeight:600, color:C.navy, padding:"4px 0" }>{k.target}</div>
               </>
             ))}
           </div>
@@ -676,8 +676,8 @@ function DetailPanel({ sub }) {
         <Row label="Benefits realization owner" value={sub.s5.realizationOwner} />
         <Row label="Success at 90 days" value={sub.s5.success90} />
         <Row label="Success at 12 months" value={sub.s5.success12mo} />
-        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>UX assessment methods</div>
+        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>UX assessment methods</div>
           <Tags items={sub.s5.uxMethods} />
         </div>
       </Section>
@@ -685,16 +685,16 @@ function DetailPanel({ sub }) {
       <Section title="Step 6 — Risk & compliance">
         <Row label="Data classification" value={sub.s6.dataClass} />
         <Row label="Does this use client data?" value={sub.s6.clientData} />
-        <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>Regulatory exposure</div>
+        <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Regulatory exposure</div>
           <Tags items={sub.s6.regs} />
         </div>
         <Row label="Model risk classification" value={sub.s6.modelRisk} />
         <Row label="Legal review required?" value={sub.s6.legalNeeded} />
         {sub.s6.legalNeeded === "Yes" && <>
           <Row label="Legal review status" value={sub.s6.legalStatus} />
-          <div style={{ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-            <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }}>Legal areas involved</div>
+          <div style={ display:"grid", gridTemplateColumns:"200px 1fr", gap:16, padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+            <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", paddingTop:1 }>Legal areas involved</div>
             <Tags items={sub.s6.legalAreas} />
           </div>
         </>}
@@ -702,32 +702,32 @@ function DetailPanel({ sub }) {
       </Section>
 
       <Section title="Step 7 — Team & resources">
-        <div style={{ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }}>
-          <div style={{ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>Core team</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 80px", gap:8 }}>
+        <div style={ padding:"10px 0", borderBottom:`1px solid ${C.mist}` }>
+          <div style={ fontSize:12, fontWeight:600, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }>Core team</div>
+          <div style={ display:"grid", gridTemplateColumns:"1fr 1fr 80px", gap:8 }>
             {["Role","Name / Team","% allocated"].map(h => (
-              <div key={h} style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }}>{h}</div>
+              <div key={h} style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.04em" }>{h}</div>
             ))}
             {sub.s7.team.map((t,i) => (
               <>
-                <div key={"tr"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{t.role}</div>
-                <div key={"tn"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{t.name}</div>
-                <div key={"tp"+i} style={{ fontSize:13, color:C.text, padding:"4px 0" }}>{t.pct}%</div>
+                <div key={"tr"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{t.role}</div>
+                <div key={"tn"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{t.name}</div>
+                <div key={"tp"+i} style={ fontSize:13, color:C.text, padding:"4px 0" }>{t.pct}%</div>
               </>
             ))}
           </div>
         </div>
         <Row label="Resource constraints / blockers" value={sub.s7.constraints} />
         <Row label="Additional notes for AI CoE" value={sub.s7.notes} />
-        <div style={{ marginTop:16, padding:"14px 18px", background:C.mist, borderRadius:10, border:`1px solid ${C.mistDark}` }}>
-          <div style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Submission summary</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 24px", fontSize:13 }}>
-            <div><span style={{ color:C.textLight }}>Initiative: </span><span style={{ fontWeight:600 }}>{sub.s1.name}</span></div>
-            <div><span style={{ color:C.textLight }}>Use case ID: </span><span style={{ fontFamily:"monospace", fontWeight:700 }}>{sub.id}</span></div>
-            <div><span style={{ color:C.textLight }}>Business line: </span><span>{sub.s1.businessLine}</span></div>
-            <div><span style={{ color:C.textLight }}>Vendor: </span><span>{sub.s1.vendor}</span></div>
-            <div><span style={{ color:C.textLight }}>Total cost: </span><span>{fmt(sub.s4.totalCost)}</span></div>
-            <div><span style={{ color:C.textLight }}>Annual value: </span><span style={{ fontWeight:700 }}>{fmt(sub.s4.annualValue)}</span></div>
+        <div style={ marginTop:16, padding:"14px 18px", background:C.mist, borderRadius:10, border:`1px solid ${C.mistDark}` }>
+          <div style={ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }>Submission summary</div>
+          <div style={ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 24px", fontSize:13 }>
+            <div><span style={ color:C.textLight }>Initiative: </span><span style={ fontWeight:600 }>{sub.s1.name}</span></div>
+            <div><span style={ color:C.textLight }>Use case ID: </span><span style={ fontFamily:"monospace", fontWeight:700 }>{sub.id}</span></div>
+            <div><span style={ color:C.textLight }>Business line: </span><span>{sub.s1.businessLine}</span></div>
+            <div><span style={ color:C.textLight }>Vendor: </span><span>{sub.s1.vendor}</span></div>
+            <div><span style={ color:C.textLight }>Total cost: </span><span>{fmt(sub.s4.totalCost)}</span></div>
+            <div><span style={ color:C.textLight }>Annual value: </span><span style={ fontWeight:700 }>{fmt(sub.s4.annualValue)}</span></div>
           </div>
         </div>
       </Section>
@@ -780,81 +780,81 @@ function ARIARepository() {
   });
 
   return (
-    <div style={{ fontFamily:"'DM Sans','Nunito',system-ui,sans-serif", background:C.mist, height:"100vh", display:"flex", flexDirection:"column" }}>
+    <div style={ fontFamily:"'DM Sans','Nunito',system-ui,sans-serif", background:C.mist, height:"100vh", display:"flex", flexDirection:"column" }>
 
-      <div style={{ background:"#1a1a1a", padding:"0 28px", flexShrink:0 }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:26, height:26, borderRadius:7, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:"#fff" }}>A</div>
-            <span style={{ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }}>ARIA</span>
-            <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }}>·</span>
-            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>Use case repository</span>
+      <div style={ background:"#1a1a1a", padding:"0 28px", flexShrink:0 }>
+        <div style={ display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }>
+          <div style={ display:"flex", alignItems:"center", gap:10 }>
+            <div style={ width:26, height:26, borderRadius:7, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:"#fff" }>A</div>
+            <span style={ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }>ARIA</span>
+            <span style={ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }>·</span>
+            <span style={ fontSize:13, color:"rgba(255,255,255,0.55)" }>Use case repository</span>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ fontSize:12, color:"rgba(255,255,255,0.5)" }}>{SUBMISSIONS.length} submissions</span>
+          <div style={ display:"flex", alignItems:"center", gap:8 }>
+            <span style={ fontSize:12, color:"rgba(255,255,255,0.5)" }>{SUBMISSIONS.length} submissions</span>
           </div>
         </div>
       </div>
 
-      <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
+      <div style={ display:"flex", flex:1, overflow:"hidden" }>
 
-        <div style={{ width:340, flexShrink:0, borderRight:`1px solid ${C.border}`, background:C.white, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        <div style={ width:340, flexShrink:0, borderRight:`1px solid ${C.border}`, background:C.white, display:"flex", flexDirection:"column", overflow:"hidden" }>
 
-          <div style={{ padding:"14px 16px", borderBottom:`1px solid ${C.mistDark}`, flexShrink:0 }}>
+          <div style={ padding:"14px 16px", borderBottom:`1px solid ${C.mistDark}`, flexShrink:0 }>
             <input
               type="text"
               placeholder="Search by name or ID..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ width:"100%", fontSize:13, padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:8, fontFamily:"inherit", color:C.text, background:C.mist, outline:"none", boxSizing:"border-box" }}
+              style={ width:"100%", fontSize:13, padding:"8px 10px", border:`1px solid ${C.border}`, borderRadius:8, fontFamily:"inherit", color:C.text, background:C.mist, outline:"none", boxSizing:"border-box" }
             />
-            <div style={{ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }}>
+            <div style={ display:"flex", gap:6, marginTop:10, flexWrap:"wrap" }>
               {stages.map(s => (
-                <button key={s} onClick={() => setStageFilter(s)} style={{
+                <button key={s} onClick={() => setStageFilter(s)} style={
                   padding:"3px 10px", fontSize:11, borderRadius:99, cursor:"pointer", fontFamily:"inherit", fontWeight:600,
                   border: stageFilter===s ? "1.5px solid #333" : `1px solid ${C.border}`,
                   background: stageFilter===s ? "#1a1a1a" : C.white,
                   color: stageFilter===s ? "#fff" : C.textMid,
-                }}>{s}</button>
+                }>{s}</button>
               ))}
             </div>
           </div>
 
-          <div style={{ overflowY:"auto", flex:1 }}>
+          <div style={ overflowY:"auto", flex:1 }>
             {filtered.length === 0 && (
-              <div style={{ padding:24, fontSize:13, color:C.textLight, textAlign:"center" }}>No submissions match your search.</div>
+              <div style={ padding:24, fontSize:13, color:C.textLight, textAlign:"center" }>No submissions match your search.</div>
             )}
             {filtered.map(sub => (
-              <div key={sub.id} onClick={() => setSelected(sub)} style={{
+              <div key={sub.id} onClick={() => setSelected(sub)} style={
                 padding:"14px 16px", borderBottom:`1px solid ${C.mistDark}`, cursor:"pointer",
                 background: selected?.id === sub.id ? "#f7f7f7" : C.white,
                 borderLeft: selected?.id === sub.id ? "3px solid #1a1a1a" : "3px solid transparent",
-              }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:C.navy, lineHeight:1.4, flex:1, paddingRight:8 }}>{sub.s1.name}</div>
+              }>
+                <div style={ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }>
+                  <div style={ fontSize:13, fontWeight:700, color:C.navy, lineHeight:1.4, flex:1, paddingRight:8 }>{sub.s1.name}</div>
                   <StageBadge stage={sub.stage} />
                 </div>
-                <div style={{ fontSize:11, fontFamily:"monospace", color:C.textLight, marginBottom:4 }}>{sub.id}</div>
-                <div style={{ fontSize:12, color:C.textMid }}>{sub.s1.businessLine} · {sub.s1.team}</div>
-                <div style={{ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }}>
+                <div style={ fontSize:11, fontFamily:"monospace", color:C.textLight, marginBottom:4 }>{sub.id}</div>
+                <div style={ fontSize:12, color:C.textMid }>{sub.s1.businessLine} · {sub.s1.team}</div>
+                <div style={ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }>
                   {sub.recommendation && (() => {
-                    const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c"},Review:{bg:"#fff8e0",color:"#a06000"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a"}}[sub.recommendation]||{bg:"#eee",color:"#555"};
-                    return <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:rc.bg,color:rc.color}}>{sub.recommendation}</span>;
+                    const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c"},Review:{bg:"#fff8e0",color:"#a06000"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a"}[sub.recommendation]||{bg:"#eee",color:"#555"};
+                    return <span style={fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:rc.bg,color:rc.color}>{sub.recommendation}</span>;
                   })()}
-                  {sub.composite_score && <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"#f0f0f0",color:"#333"}}>{sub.composite_score}/100</span>}
+                  {sub.composite_score && <span style={fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"#f0f0f0",color:"#333"}>{sub.composite_score}/100</span>}
                 </div>
-                <div style={{ display:"flex", gap:16, marginTop:8 }}>
+                <div style={ display:"flex", gap:16, marginTop:8 }>
                   <div>
-                    <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Cost</div>
-                    <div style={{ fontSize:12, fontWeight:600, color:C.navy }}>{fmt(sub.s4.totalCost)}</div>
+                    <div style={ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }>Cost</div>
+                    <div style={ fontSize:12, fontWeight:600, color:C.navy }>{fmt(sub.s4.totalCost)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Annual value</div>
-                    <div style={{ fontSize:12, fontWeight:600, color:C.navy }}>{fmt(sub.s4.annualValue)}</div>
+                    <div style={ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }>Annual value</div>
+                    <div style={ fontSize:12, fontWeight:600, color:C.navy }>{fmt(sub.s4.annualValue)}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Vendor</div>
-                    <div style={{ fontSize:12, color:C.textMid }}>{sub.s1.vendor.split(" ")[0]}</div>
+                    <div style={ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }>Vendor</div>
+                    <div style={ fontSize:12, color:C.textMid }>{sub.s1.vendor.split(" ")[0]}</div>
                   </div>
                 </div>
               </div>
@@ -862,9 +862,9 @@ function ARIARepository() {
           </div>
         </div>
 
-        <div style={{ flex:1, overflowY:"auto", background:"#fafafa" }}>
+        <div style={ flex:1, overflowY:"auto", background:"#fafafa" }>
           {selected ? <DetailPanel sub={selected} /> : (
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", color:C.textLight, fontSize:14 }}>
+            <div style={ display:"flex", alignItems:"center", justifyContent:"center", height:"100%", color:C.textLight, fontSize:14 }>
               Select a submission to view details
             </div>
           )}
