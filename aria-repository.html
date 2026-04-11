@@ -23,115 +23,115 @@ const { useState, useEffect } = React;
 
 const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+
+const SCORING_PROMPT = `You are the ARIA prioritization engine for an enterprise AI portfolio management platform at Capital Group.
+
+Score this AI initiative across 6 dimensions (each 1-5):
+1. strategic_fit: 5=supports 2+ pillars AND on AI CoE roadmap, 4=1-2 pillars on roadmap, 3=1 pillar not on roadmap, 2=partial, 1=none
+2. expected_impact (annual_value): 5=>$2M, 4=$1M-$2M, 3=$500K-$1M, 2=$100K-$500K, 1=<$100K
+3. feasibility (problem clarity, deps, team): 5=clear+full team+no blockers, 4=mostly, 3=some gaps, 2=significant gaps, 1=unclear+no team
+4. cost (lower=higher score, total_cost): 5=<$100K, 4=$100K-$250K, 3=$250K-$500K, 2=$500K-$1M, 1=>$1M
+5. resource (team completeness): 5=all named+confirmed, 4=mostly named, 3=some TBD, 2=most TBD, 1=no team
+6. risk (data_class, model_risk, regs, legal): 5=low risk all, 4=moderate, 3=elevated, 2=high, 1=critical
+
+COMPOSITE = (strategic_fit×0.25 + expected_impact×0.20 + feasibility×0.20 + cost×0.15 + resource×0.10 + risk×0.10) × 20
+RECOMMENDATION: Prioritize (>=70), Review (45-69), Deprioritize (<45)
+
+Respond ONLY with valid JSON no markdown:
+{"score_strategic_fit":0,"score_expected_impact":0,"score_feasibility":0,"score_cost":0,"score_resource":0,"score_risk":0,"composite_score":0,"recommendation":"Review","score_rationale":{"strategic_fit":"","expected_impact":"","feasibility":"","cost":"","resource":"","risk":""},"score_flags":[],"score_summary":""}`;
+
+async function scoreWithClaude(data) {
+  const res = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: SCORING_PROMPT + "\n\nSubmission:\n" + JSON.stringify(data, null, 2) }]
+    })
+  });
+  const d = await res.json();
+  const text = d.content[0].text.replace(/```json|```/g, "").trim();
+  return JSON.parse(text);
+}
 
 async function fetchSubmissions() {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/aria_usecases?select=*&order=submitted_date.desc`,
-    {
-      headers: {
-        "apikey": SUPABASE_KEY,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
-      },
-    }
-  );
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/aria_usecases?select=*&order=submitted_date.desc`, {
+    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-// Map flat Supabase row → nested structure used by DetailPanel
+async function patchSupabase(useCase_id, data) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/aria_usecases?use_case_id=eq.${useCase_id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Prefer": "return=representation"
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 function mapRow(r) {
   return {
-    id: r.use_case_id,
-    stage: r.stage,
-    submittedDate: r.submitted_date,
-    s1: {
-      name: r.name,
-      businessLine: r.business_line,
-      team: r.team,
-      sponsor: r.sponsor,
-      owner: r.owner,
-      startDate: r.start_date,
-      goLiveDate: r.go_live_date,
-      vendor: r.vendor,
-      otherVendor: r.other_vendor,
-    },
-    s2: {
-      problem: r.problem,
-      adopters: r.adopters,
-      whyNow: r.why_now,
-      inaction: r.inaction,
-      problemTypes: r.problem_types || [],
-    },
-    s3: {
-      pillars: r.pillars || [],
-      howAligned: r.how_aligned,
-      roadmap: r.roadmap,
-      dependencies: r.dependencies,
-    },
-    s4: {
-      totalCost: r.total_cost,
-      confidence: r.cost_confidence,
-      buildCost: r.build_cost,
-      licenseCost: r.license_cost,
-      runCost: r.run_cost,
-      returnType: r.return_type,
-      calcInputs: buildCalcInputs(r),
-      annualValue: r.annual_value,
-      payback: r.payback_months,
-    },
-    s5: {
-      kpiCats: r.kpi_cats || [],
-      kpis: r.kpis || [],
-      measureMethod: r.measure_method,
-      realizationOwner: r.realization_owner,
-      success90: r.success_90,
-      success12mo: r.success_12mo,
-      uxMethods: r.ux_methods || [],
-    },
-    s6: {
-      dataClass: r.data_class,
-      clientData: r.client_data,
-      regs: r.regs || [],
-      modelRisk: r.model_risk,
-      legalNeeded: r.legal_needed,
-      legalStatus: r.legal_status,
-      legalAreas: r.legal_areas || [],
-      risks: r.risks,
-    },
-    s7: {
-      team: r.team_members || [],
-      constraints: r.constraints,
-      notes: r.notes,
-    },
+    id: r.use_case_id, stage: r.stage, submittedDate: r.submitted_date,
+    raw: r,
+    composite_score: r.composite_score,
+    recommendation: r.recommendation,
+    score_rationale: r.score_rationale,
+    score_flags: r.score_flags,
+    score_summary: r.score_summary,
+    score_strategic_fit: r.score_strategic_fit,
+    score_expected_impact: r.score_expected_impact,
+    score_feasibility: r.score_feasibility,
+    score_cost: r.score_cost,
+    score_resource: r.score_resource,
+    score_risk: r.score_risk,
+    scored_at: r.scored_at,
+    s1: { name:r.name, businessLine:r.business_line, team:r.team, sponsor:r.sponsor, owner:r.owner, startDate:r.start_date, goLiveDate:r.go_live_date, vendor:r.vendor, otherVendor:r.other_vendor },
+    s2: { problem:r.problem, adopters:r.adopters, whyNow:r.why_now, inaction:r.inaction, problemTypes:r.problem_types||[] },
+    s3: { pillars:r.pillars||[], howAligned:r.how_aligned, roadmap:r.roadmap, dependencies:r.dependencies },
+    s4: { totalCost:r.total_cost, confidence:r.cost_confidence, buildCost:r.build_cost, licenseCost:r.license_cost, runCost:r.run_cost, returnType:r.return_type, annualValue:r.annual_value, payback:r.payback_months,
+      calcInputs: buildCalcInputs(r) },
+    s5: { kpiCats:r.kpi_cats||[], kpis:r.kpis||[], measureMethod:r.measure_method, realizationOwner:r.realization_owner, success90:r.success_90, success12mo:r.success_12mo, uxMethods:r.ux_methods||[] },
+    s6: { dataClass:r.data_class, clientData:r.client_data, regs:r.regs||[], modelRisk:r.model_risk, legalNeeded:r.legal_needed, legalStatus:r.legal_status, legalAreas:r.legal_areas||[], risks:r.risks },
+    s7: { team:r.team_members||[], constraints:r.constraints, notes:r.notes },
   };
 }
 
 function buildCalcInputs(r) {
-  const fmt = v => v ? "$" + Number(v).toLocaleString() : "—";
+  const f = v => v ? "$" + Number(v).toLocaleString() : "—";
   const rt = r.return_type;
-  if (rt === "Cost savings") return [
-    { label: "FTE redeployment", a: r.cost_ftes ? r.cost_ftes + " FTEs" : "—", subtotal: r.cost_ftes && r.cost_time_pct && r.cost_salary ? fmt(r.cost_ftes*(r.cost_time_pct/100)*r.cost_salary)+"/yr" : "—" },
-    { label: "Licenses eliminated", a: r.cost_licenses ? r.cost_licenses + " licenses" : "—", subtotal: r.cost_licenses && r.cost_license_amt ? fmt(r.cost_licenses*r.cost_license_amt)+"/yr" : "—" },
-    { label: "Infrastructure reduction", a: "—", subtotal: r.cost_infra ? fmt(r.cost_infra)+"/yr" : "—" },
+  if(rt==="Cost savings") return [
+    {label:"FTE redeployment", a:r.cost_ftes?r.cost_ftes+" FTEs":"—", subtotal:r.cost_ftes&&r.cost_time_pct&&r.cost_salary?f(r.cost_ftes*(r.cost_time_pct/100)*r.cost_salary)+"/yr":"—"},
+    {label:"Licenses eliminated", a:r.cost_licenses?r.cost_licenses+" licenses":"—", subtotal:r.cost_licenses&&r.cost_license_amt?f(r.cost_licenses*r.cost_license_amt)+"/yr":"—"},
+    {label:"Infrastructure reduction", a:"—", subtotal:r.cost_infra?f(r.cost_infra)+"/yr":"—"},
   ];
-  if (rt === "Efficiency / productivity") return [
-    { label: "Hours saved / week", a: r.eff_hrs ? r.eff_hrs + " hrs" : "—", b: r.eff_rate ? fmt(r.eff_rate)+"/hr" : "—", subtotal: r.eff_hrs && r.eff_rate ? fmt(r.eff_hrs*52*r.eff_rate)+"/yr" : "—" },
-    { label: "Errors reduced / month", a: r.eff_errors ? r.eff_errors + " errors" : "—", b: r.eff_error_cost ? fmt(r.eff_error_cost)+"/error" : "—", subtotal: r.eff_errors && r.eff_error_cost ? fmt(r.eff_errors*12*r.eff_error_cost)+"/yr" : "—" },
-    { label: "Queries deflected / month", a: r.eff_queries ? r.eff_queries + " queries" : "—", b: r.eff_query_cost ? fmt(r.eff_query_cost)+"/query" : "—", subtotal: r.eff_queries && r.eff_query_cost ? fmt(r.eff_queries*12*r.eff_query_cost)+"/yr" : "—" },
+  if(rt==="Efficiency / productivity") return [
+    {label:"Hours saved / week", a:r.eff_hrs?r.eff_hrs+" hrs":"—", b:r.eff_rate?f(r.eff_rate)+"/hr":"—", subtotal:r.eff_hrs&&r.eff_rate?f(r.eff_hrs*52*r.eff_rate)+"/yr":"—"},
+    {label:"Errors reduced / month", a:r.eff_errors?r.eff_errors+" errors":"—", b:r.eff_error_cost?f(r.eff_error_cost)+"/error":"—", subtotal:r.eff_errors&&r.eff_error_cost?f(r.eff_errors*12*r.eff_error_cost)+"/yr":"—"},
+    {label:"Queries deflected / month", a:r.eff_queries?r.eff_queries+" queries":"—", b:r.eff_query_cost?f(r.eff_query_cost)+"/query":"—", subtotal:r.eff_queries&&r.eff_query_cost?f(r.eff_queries*12*r.eff_query_cost)+"/yr":"—"},
   ];
-  if (rt === "Revenue generation") return [
-    { label: "New deals", a: r.rev_deals ? r.rev_deals + " deals/yr" : "—", subtotal: r.rev_deals && r.rev_deal_value ? fmt(r.rev_deals*r.rev_deal_value)+"/yr" : "—" },
-    { label: "Conversion lift", a: r.rev_lift ? r.rev_lift + "%" : "—", subtotal: r.rev_lift && r.rev_base ? fmt((r.rev_lift/100)*r.rev_base)+"/yr" : "—" },
+  if(rt==="Risk reduction") return [
+    {label:"Incident avoidance", a:r.risk_prob?r.risk_prob+"% prob":"—", subtotal:r.risk_prob&&r.risk_incident?f((r.risk_prob/100)*r.risk_incident)+"/yr":"—"},
+    {label:"Regulatory fine", a:r.risk_fine_likely?r.risk_fine_likely+"% likelihood":"—", subtotal:r.risk_fine&&r.risk_fine_likely?f(r.risk_fine*(r.risk_fine_likely/100))+"/yr":"—"},
   ];
-  if (rt === "Risk reduction") return [
-    { label: "Incident avoidance", a: r.risk_prob ? r.risk_prob + "% probability" : "—", subtotal: r.risk_prob && r.risk_incident ? fmt((r.risk_prob/100)*r.risk_incident)+"/yr" : "—" },
-    { label: "Regulatory fine", a: r.risk_fine_likely ? r.risk_fine_likely + "% likelihood" : "—", subtotal: r.risk_fine && r.risk_fine_likely ? fmt(r.risk_fine*(r.risk_fine_likely/100))+"/yr" : "—" },
+  if(rt==="Revenue generation") return [
+    {label:"New deals", a:r.rev_deals?r.rev_deals+" deals/yr":"—", subtotal:r.rev_deals&&r.rev_deal_value?f(r.rev_deals*r.rev_deal_value)+"/yr":"—"},
+    {label:"Conversion lift", a:r.rev_lift?r.rev_lift+"%":"—", subtotal:r.rev_lift&&r.rev_base?f((r.rev_lift/100)*r.rev_base)+"/yr":"—"},
   ];
-  if (rt === "Mixed (multiple types)") return [
-    { label: "Cost savings", a: "—", subtotal: r.mix_cost ? fmt(r.mix_cost) : "—" },
-    { label: "Efficiency gains", a: "—", subtotal: r.mix_eff ? fmt(r.mix_eff) : "—" },
-    { label: "Revenue generated", a: "—", subtotal: r.mix_rev ? fmt(r.mix_rev) : "—" },
-    { label: "Risk avoided", a: "—", subtotal: r.mix_risk ? fmt(r.mix_risk) : "—" },
+  if(rt==="Mixed (multiple types)") return [
+    {label:"Cost savings", a:"—", subtotal:r.mix_cost?f(r.mix_cost):"—"},
+    {label:"Efficiency gains", a:"—", subtotal:r.mix_eff?f(r.mix_eff):"—"},
+    {label:"Revenue generated", a:"—", subtotal:r.mix_rev?f(r.mix_rev):"—"},
+    {label:"Risk avoided", a:"—", subtotal:r.mix_risk?f(r.mix_risk):"—"},
   ];
   return [];
 }
@@ -542,6 +542,56 @@ function DetailPanel({ sub }) {
         </div>
       </div>
 
+      {sub.recommendation && (() => {
+        const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c",border:"#a0d4b0"},Review:{bg:"#fff8e0",color:"#a06000",border:"#f0d080"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a",border:"#f0a0a0"}}[sub.recommendation]||{bg:"#f0f0f0",color:"#555",border:"#ccc"};
+        const dims = [
+          {label:"Strategic fit", score:sub.score_strategic_fit, note:sub.score_rationale?.strategic_fit},
+          {label:"Expected impact", score:sub.score_expected_impact, note:sub.score_rationale?.expected_impact},
+          {label:"Feasibility", score:sub.score_feasibility, note:sub.score_rationale?.feasibility},
+          {label:"Cost", score:sub.score_cost, note:sub.score_rationale?.cost},
+          {label:"Resource", score:sub.score_resource, note:sub.score_rationale?.resource},
+          {label:"Risk", score:sub.score_risk, note:sub.score_rationale?.risk},
+        ];
+        return (
+          <div style={{marginBottom:28}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+              <div style={{width:3,height:16,borderRadius:99,background:"#333",flexShrink:0}} />
+              <span style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em",color:"#555"}}>AI CoE Prioritization Score</span>
+              <div style={{flex:1,height:1,background:"#e0e0e0"}} />
+              <button onClick={()=>handleRescore(sub)} disabled={rescoring} style={{fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #ccc",background:"#fff",cursor:"pointer",fontFamily:"inherit",color:"#333"}}>{rescoring?"Scoring...":"Re-score"}</button>
+              <a href={`index.html?edit=${sub.id}`} style={{fontSize:12,fontWeight:600,padding:"4px 12px",borderRadius:8,border:"1px solid #1a1a1a",background:"#1a1a1a",cursor:"pointer",fontFamily:"inherit",color:"#fff",textDecoration:"none"}}>Edit</a>
+            </div>
+            <div style={{padding:"14px 18px",background:rc.bg,border:`1px solid ${rc.border}`,borderRadius:12,marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <span style={{fontSize:11,fontWeight:700,color:rc.color,textTransform:"uppercase",letterSpacing:"0.06em"}}>Recommendation</span>
+                <div style={{display:"flex",alignItems:"baseline",gap:12}}>
+                  <span style={{fontSize:22,fontWeight:800,color:"#1a1a1a"}}>{sub.composite_score}<span style={{fontSize:12,color:"#999",fontWeight:400}}>/100</span></span>
+                  <span style={{fontSize:14,fontWeight:700,color:rc.color}}>{sub.recommendation}</span>
+                </div>
+              </div>
+              <div style={{fontSize:13,color:"#555",lineHeight:1.6}}>{sub.score_summary}</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+              {dims.map(d=>(
+                <div key={d.label} style={{padding:"8px 10px",background:"#f5f5f5",borderRadius:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:11,fontWeight:600,color:"#888"}}>{d.label}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#1a1a1a"}}>{d.score}/5</span>
+                  </div>
+                  <div style={{fontSize:11,color:"#999",lineHeight:1.4}}>{d.note}</div>
+                </div>
+              ))}
+            </div>
+            {sub.score_flags && sub.score_flags.length > 0 && (
+              <div style={{padding:"8px 12px",background:"#fff8e0",border:"1px solid #f0d080",borderRadius:8}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#a06000",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:4}}>Flags</div>
+                {sub.score_flags.map((f,i)=><div key={i} style={{fontSize:12,color:"#7a4d00"}}>• {f}</div>)}
+              </div>
+            )}
+            {sub.scored_at && <div style={{fontSize:11,color:"#bbb",marginTop:6,textAlign:"right"}}>Scored {new Date(sub.scored_at).toLocaleString()}</div>}
+          </div>
+        );
+      })()}
       <Section title="Step 1 — Basic information">
         <Row label="Use case ID" value={sub.id} mono />
         <Row label="AI initiative name" value={sub.s1.name} />
@@ -691,12 +741,12 @@ function ARIARepository() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [rescoring, setRescoring] = useState(false);
 
   useEffect(() => {
     fetchSubmissions()
       .then(rows => {
         const live = rows.map(mapRow);
-        // Merge: live Supabase rows first, then hardcoded samples not already in live
         const liveIds = new Set(live.map(r => r.id));
         const merged = [...live, ...SUBMISSIONS.filter(s => !liveIds.has(s.id))];
         setAllSubmissions(merged);
@@ -705,6 +755,18 @@ function ARIARepository() {
       .catch(e => setFetchError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleRescore(sub) {
+    setRescoring(true);
+    try {
+      const scores = await scoreWithClaude(sub.raw || sub);
+      await patchSupabase(sub.id, { ...scores, scored_at: new Date().toISOString() });
+      const updated = { ...sub, ...scores };
+      setAllSubmissions(prev => prev.map(s => s.id === sub.id ? updated : s));
+      setSelected(updated);
+    } catch(e) { alert("Rescore failed: " + e.message); }
+    finally { setRescoring(false); }
+  }
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("All");
 
@@ -774,6 +836,13 @@ function ARIARepository() {
                 </div>
                 <div style={{ fontSize:11, fontFamily:"monospace", color:C.textLight, marginBottom:4 }}>{sub.id}</div>
                 <div style={{ fontSize:12, color:C.textMid }}>{sub.s1.businessLine} · {sub.s1.team}</div>
+                <div style={{ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }}>
+                  {sub.recommendation && (() => {
+                    const rc = {Prioritize:{bg:"#e6f4ea",color:"#1a7a3c"},Review:{bg:"#fff8e0",color:"#a06000"},Deprioritize:{bg:"#fce8e8",color:"#a01a1a"}}[sub.recommendation]||{bg:"#eee",color:"#555"};
+                    return <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:rc.bg,color:rc.color}}>{sub.recommendation}</span>;
+                  })()}
+                  {sub.composite_score && <span style={{fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,background:"#f0f0f0",color:"#333"}}>{sub.composite_score}/100</span>}
+                </div>
                 <div style={{ display:"flex", gap:16, marginTop:8 }}>
                   <div>
                     <div style={{ fontSize:10, color:C.textLight, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em" }}>Cost</div>
