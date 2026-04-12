@@ -219,6 +219,7 @@ function ARIADashboard() {
     .filter(r => filterBL === "All" || r.business_line === filterBL)
     .sort((a, b) => {
       if (sortBy === "score") return (b.composite_score || 0) - (a.composite_score || 0);
+      if (sortBy === "netprofit") return ((parseFloat(b.annual_value)||0) - (parseFloat(b.total_cost)||0)) - ((parseFloat(a.annual_value)||0) - (parseFloat(a.total_cost)||0));
       if (sortBy === "cost") return (b.total_cost || 0) - (a.total_cost || 0);
       if (sortBy === "value") return (b.annual_value || 0) - (a.annual_value || 0);
       if (sortBy === "stage") return (a.stage || "").localeCompare(b.stage || "");
@@ -274,10 +275,11 @@ function ARIADashboard() {
         )}
 
         {/* Metric cards */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:24 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:16, marginBottom:24 }}>
           <MetricCard label="Total initiatives" value={rows.length} sub={scoredCount + " scored by AI CoE"} accent="#1a1a1a" />
           <MetricCard label="Total investment" value={fmtM(totalCost)} sub="across all submissions" accent="#378ADD" />
           <MetricCard label="Projected annual value" value={fmtM(totalValue)} sub="combined portfolio value" accent="#3a8a64" />
+          <MetricCard label="Net returns" value={fmtM(Math.max(0, totalValue - totalCost))} sub={"annual value minus cost"} accent={totalValue > totalCost ? "#3a8a64" : "#a01a1a"} />
           <MetricCard label="Portfolio ROI" value={portfolioROI + "%"} sub={"value ÷ investment"} accent={portfolioROI >= 100 ? "#3a8a64" : "#c07820"} />
         </div>
 
@@ -324,7 +326,7 @@ function ARIADashboard() {
                 }}>{bl}</button>
               ))}
               <span style={{ fontSize:12, color:C.textLight, marginLeft:8 }}>Sort:</span>
-              {[["score","Score"],["cost","Cost"],["value","Value"],["stage","Stage"]].map(([key,label]) => (
+              {[["score","Score"],["netprofit","Net profit"],["cost","Cost"],["value","Value"],["stage","Stage"]].map(([key,label]) => (
                 <button key={key} onClick={() => setSortBy(key)} style={{
                   padding:"4px 12px", fontSize:12, borderRadius:99, cursor:"pointer", fontFamily:"inherit",
                   border: sortBy===key ? "1.5px solid #1a1a1a" : "1px solid #ddd",
@@ -351,6 +353,7 @@ function ARIADashboard() {
                     <th style={thStyle("score")} onClick={() => setSortBy("score")}>Score</th>
                     <th style={thStyle("cost")} onClick={() => setSortBy("cost")}>Total cost</th>
                     <th style={thStyle("value")} onClick={() => setSortBy("value")}>Annual value</th>
+                    <th style={thStyle("netprofit")} onClick={() => setSortBy("netprofit")}>Net profit</th>
                     <th style={thStyle(null)}>Payback</th>
                     <th style={thStyle(null)}>Vendor</th>
                     <th style={thStyle(null)}></th>
@@ -369,6 +372,9 @@ function ARIADashboard() {
                       <td style={tdStyle}><ScoreBar score={r.composite_score} /></td>
                       <td style={{ ...tdStyle, fontWeight:600 }}>{fmt(r.total_cost)}</td>
                       <td style={{ ...tdStyle, fontWeight:600, color:"#1a7a3c" }}>{fmt(r.annual_value)}</td>
+                      <td style={{ ...tdStyle, fontWeight:700, color:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0) > 0 ? "#1a7a3c" : "#a01a1a" }}>
+                        {(() => { const np = (parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0); return np !== 0 ? (np > 0 ? "+" : "") + fmt(Math.abs(np)) : "—"; })()}
+                      </td>
                       <td style={tdStyle}>{r.payback_months ? r.payback_months + " mo" : "—"}</td>
                       <td style={{ ...tdStyle, fontSize:12, color:C.textMid }}>{r.vendor ? r.vendor.split(" ")[0] : "—"}</td>
                       <td style={tdStyle}>
@@ -395,6 +401,9 @@ function ARIADashboard() {
               </div>
               <div style={{ fontSize:12, color:C.textMid }}>
                 Total annual value: <span style={{ fontWeight:700, color:"#1a7a3c" }}>{fmt(tableRows.reduce((s,r) => s+(parseFloat(r.annual_value)||0), 0))}</span>
+              </div>
+              <div style={{ fontSize:12, color:C.textMid }}>
+                Total net profit: <span style={{ fontWeight:700, color:"#1a7a3c" }}>{fmt(tableRows.reduce((s,r) => s+((parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0)), 0))}</span>
               </div>
               <div style={{ fontSize:12, color:C.textMid }}>
                 Avg score: <span style={{ fontWeight:700, color:C.navy }}>
