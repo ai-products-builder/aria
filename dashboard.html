@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARIA — Portfolio Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100%; font-family: "DM Sans", system-ui, sans-serif; background: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const SURL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
+const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
+
+const C = {
+  navy: "#1a1a1a", border: "#e0e0e0", text: "#1a1a1a",
+  textMid: "#555", textLight: "#999", white: "#fff", mist: "#f2f2f2",
+};
+
+const STAGE_COLORS = {
+  "Ideation":       "#888780",
+  "Assessment":     "#378ADD",
+  "Approved":       "#3a8a64",
+  "In development": "#c07820",
+  "Piloting":       "#7b72cc",
+  "Live":           "#007a8a",
+  "Scaled":         "#1a56a0",
+  "Retired":        "#a01a1a",
+};
+
+const REC_COLORS = {
+  "Prioritize":   { bg:"#e6f4ea", color:"#1a7a3c", border:"#a0d4b0" },
+  "Review":       { bg:"#fff8e0", color:"#a06000", border:"#f0d080" },
+  "Deprioritize": { bg:"#fce8e8", color:"#a01a1a", border:"#f0a0a0" },
+};
+
+const BL_COLORS = ["#1a1a1a","#555","#888","#bbb","#378ADD","#3a8a64","#c07820","#7b72cc"];
+
+function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
+function fmtM(v) { return v >= 1000000 ? "$" + (v/1000000).toFixed(1) + "M" : v >= 1000 ? "$" + (v/1000).toFixed(0) + "K" : fmt(v); }
+
+async function fetchAll() {
+  const res = await fetch(SURL + "/rest/v1/aria_usecases?select=*&order=composite_score.desc.nullslast", {
+    headers: { "apikey": SKEY, "Authorization": "Bearer " + SKEY }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ── Donut Chart ──────────────────────────────────────────────────────────────
+function DonutChart({ data, title, total }) {
+  const size = 140, cx = 70, cy = 70, r = 52, stroke = 18;
+  const circumference = 2 * Math.PI * r;
+  let offset = 0;
+  const slices = data.map((d, i) => {
+    const pct = total > 0 ? d.value / total : 0;
+    const dash = pct * circumference;
+    const gap = circumference - dash;
+    const slice = { ...d, dash, gap, offset, pct };
+    offset += dash;
+    return slice;
+  });
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center" }}>
+      <div style={{ fontSize:13, fontWeight:700, color:C.textMid, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:12 }}>{title}</div>
+      <div style={{ position:"relative", width:size, height:size }}>
+        <svg width={size} height={size} viewBox={"0 0 " + size + " " + size} style={{ transform:"rotate(-90deg)" }}>
+          {total === 0 && <circle cx={cx} cy={cy} r={r} fill="none" stroke="#eee" strokeWidth={stroke} />}
+          {slices.map((s, i) => (
+            <circle key={i} cx={cx} cy={cy} r={r} fill="none"
+              stroke={s.color} strokeWidth={stroke}
+              strokeDasharray={s.dash + " " + s.gap}
+              strokeDashoffset={-s.offset}
+            />
+          ))}
+        </svg>
+        <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", textAlign:"center" }}>
+          <div style={{ fontSize:22, fontWeight:800, color:C.navy, lineHeight:1 }}>{total}</div>
+          <div style={{ fontSize:10, color:C.textLight, marginTop:2 }}>total</div>
+        </div>
+      </div>
+      <div style={{ marginTop:14, display:"flex", flexDirection:"column", gap:5, width:"100%" }}>
+        {slices.map((s, i) => (
+          <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+              <div style={{ width:10, height:10, borderRadius:2, background:s.color, flexShrink:0 }} />
+              <span style={{ fontSize:12, color:C.textMid }}>{s.label}</span>
+            </div>
+            <span style={{ fontSize:12, fontWeight:600, color:C.navy }}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Horizontal Bar Chart ─────────────────────────────────────────────────────
+function BarChart({ data, title, formatVal }) {
+  const max = Math.max(...data.map(d => d.value), 1);
+  return (
+    <div>
+      <div style={{ fontSize:13, fontWeight:700, color:C.textMid, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:14 }}>{title}</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        {data.map((d, i) => (
+          <div key={i}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+              <span style={{ fontSize:12, color:C.text, fontWeight:500 }}>{d.label}</span>
+              <span style={{ fontSize:12, fontWeight:700, color:C.navy }}>{formatVal ? formatVal(d.value) : d.value}</span>
+            </div>
+            <div style={{ height:8, background:"#f0f0f0", borderRadius:99, overflow:"hidden" }}>
+              <div style={{ height:"100%", width:(d.value/max*100)+"%", background:d.color || C.navy, borderRadius:99, transition:"width 0.6s ease" }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Score Mini Bar ────────────────────────────────────────────────────────────
+function ScoreBar({ score }) {
+  if (!score) return <span style={{ fontSize:12, color:C.textLight }}>—</span>;
+  const color = score >= 70 ? "#1a7a3c" : score >= 45 ? "#a06000" : "#a01a1a";
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+      <div style={{ width:60, height:6, background:"#eee", borderRadius:99, overflow:"hidden" }}>
+        <div style={{ height:"100%", width:score+"%", background:color, borderRadius:99 }} />
+      </div>
+      <span style={{ fontSize:12, fontWeight:700, color:color, minWidth:28 }}>{score}</span>
+    </div>
+  );
+}
+
+function RecBadge({ rec }) {
+  if (!rec) return <span style={{ fontSize:11, color:C.textLight }}>Unscored</span>;
+  const r = REC_COLORS[rec] || { bg:"#eee", color:"#555", border:"#ccc" };
+  return <span style={{ display:"inline-flex", padding:"2px 8px", borderRadius:99, fontSize:11, fontWeight:700, background:r.bg, color:r.color, border:"1px solid " + r.border, whiteSpace:"nowrap" }}>{rec}</span>;
+}
+
+function StagePill({ stage }) {
+  const color = STAGE_COLORS[stage] || "#888";
+  return <span style={{ display:"inline-flex", padding:"2px 8px", borderRadius:99, fontSize:11, fontWeight:600, background:color + "22", color:color, border:"1px solid " + color + "44", whiteSpace:"nowrap" }}>{stage}</span>;
+}
+
+function MetricCard({ label, value, sub, accent }) {
+  return (
+    <div style={{ background:C.white, border:"1px solid " + C.border, borderRadius:12, padding:"18px 20px", borderTop: "3px solid " + (accent || C.navy) }}>
+      <div style={{ fontSize:11, fontWeight:700, color:C.textLight, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>{label}</div>
+      <div style={{ fontSize:26, fontWeight:800, color:C.navy, lineHeight:1, marginBottom:4 }}>{value}</div>
+      {sub && <div style={{ fontSize:12, color:C.textMid }}>{sub}</div>}
+    </div>
+  );
+}
+
+function ARIADashboard() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [sortBy, setSortBy] = useState("score");
+  const [filterBL, setFilterBL] = useState("All");
+
+  useEffect(() => {
+    fetchAll()
+      .then(data => setRows(data))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // ── Portfolio metrics ──────────────────────────────────────────────────────
+  const totalCost = rows.reduce((s, r) => s + (parseFloat(r.total_cost) || 0), 0);
+  const totalValue = rows.reduce((s, r) => s + (parseFloat(r.annual_value) || 0), 0);
+  const portfolioROI = totalCost > 0 ? Math.round((totalValue / totalCost) * 100) : 0;
+  const scoredCount = rows.filter(r => r.composite_score).length;
+
+  // ── Stage breakdown ────────────────────────────────────────────────────────
+  const stageCounts = {};
+  rows.forEach(r => { stageCounts[r.stage] = (stageCounts[r.stage] || 0) + 1; });
+  const stageData = Object.entries(stageCounts).map(([label, value]) => ({
+    label, value, color: STAGE_COLORS[label] || "#888"
+  })).sort((a, b) => b.value - a.value);
+
+  // ── Investment by business line ────────────────────────────────────────────
+  const blCosts = {};
+  rows.forEach(r => {
+    const bl = r.business_line || "Unknown";
+    blCosts[bl] = (blCosts[bl] || 0) + (parseFloat(r.total_cost) || 0);
+  });
+  const blData = Object.entries(blCosts)
+    .map(([label, value], i) => ({ label, value, color: BL_COLORS[i % BL_COLORS.length] }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+
+  // ── Recommendation split ───────────────────────────────────────────────────
+  const recCounts = { Prioritize: 0, Review: 0, Deprioritize: 0 };
+  rows.forEach(r => { if (r.recommendation) recCounts[r.recommendation] = (recCounts[r.recommendation] || 0) + 1; });
+  const recData = [
+    { label:"Prioritize",   value:recCounts.Prioritize,   color:"#1a7a3c" },
+    { label:"Review",       value:recCounts.Review,       color:"#a06000" },
+    { label:"Deprioritize", value:recCounts.Deprioritize, color:"#a01a1a" },
+  ];
+  const totalScored = recData.reduce((s, d) => s + d.value, 0);
+
+  // ── Ranked table ───────────────────────────────────────────────────────────
+  const businessLines = ["All", ...Array.from(new Set(rows.map(r => r.business_line).filter(Boolean)))];
+
+  const tableRows = [...rows]
+    .filter(r => filterBL === "All" || r.business_line === filterBL)
+    .sort((a, b) => {
+      if (sortBy === "score") return (b.composite_score || 0) - (a.composite_score || 0);
+      if (sortBy === "cost") return (b.total_cost || 0) - (a.total_cost || 0);
+      if (sortBy === "value") return (b.annual_value || 0) - (a.annual_value || 0);
+      if (sortBy === "stage") return (a.stage || "").localeCompare(b.stage || "");
+      return 0;
+    });
+
+  const thStyle = (key) => ({
+    padding:"10px 12px", textAlign:"left", fontSize:11, fontWeight:700,
+    color:sortBy===key ? C.navy : C.textLight,
+    textTransform:"uppercase", letterSpacing:"0.05em", cursor:"pointer",
+    borderBottom:"2px solid " + (sortBy===key ? C.navy : C.border),
+    whiteSpace:"nowrap", userSelect:"none",
+  });
+
+  const tdStyle = { padding:"12px 12px", fontSize:13, color:C.text, borderBottom:"1px solid #f5f5f5", verticalAlign:"middle" };
+
+  return (
+    <div style={{ fontFamily:"'DM Sans',system-ui,sans-serif", background:C.mist, minHeight:"100vh" }}>
+
+      {/* Nav */}
+      <div style={{ background:"#1a1a1a", padding:"0 28px" }}>
+        <div style={{ maxWidth:1200, margin:"0 auto", display:"flex", alignItems:"center", justifyContent:"space-between", height:52 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:26, height:26, borderRadius:7, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:"#fff" }}>A</div>
+            <span style={{ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }}>ARIA</span>
+            <span style={{ fontSize:12, color:"rgba(255,255,255,0.3)", margin:"0 6px" }}>·</span>
+            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>Portfolio dashboard</span>
+          </div>
+          <div style={{ display:"flex", gap:20 }}>
+            {[["+ New intake","index.html"],["Repository","aria-repository.html"],["Dashboard","aria-dashboard.html"]].map(([label, href]) => (
+              <a key={href} href={href} style={{ fontSize:13, color: href==="aria-dashboard.html" ? "#fff" : "rgba(255,255,255,0.55)", textDecoration:"none", fontWeight: href==="aria-dashboard.html" ? 700 : 400 }}>{label}</a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth:1200, margin:"0 auto", padding:"28px 28px 60px" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, flexWrap:"wrap", gap:12 }}>
+          <div>
+            <div style={{ fontSize:24, fontWeight:800, color:C.navy }}>AI portfolio overview</div>
+            <div style={{ fontSize:14, color:C.textMid, marginTop:3 }}>
+              {loading ? "Loading..." : rows.length + " initiatives · " + scoredCount + " scored · Last updated " + new Date().toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ padding:"14px 18px", background:"#fce8e8", border:"1px solid #f0a0a0", borderRadius:10, color:"#a01a1a", fontSize:13, marginBottom:20 }}>
+            Failed to load data: {error}
+          </div>
+        )}
+
+        {/* Metric cards */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:24 }}>
+          <MetricCard label="Total initiatives" value={rows.length} sub={scoredCount + " scored by AI CoE"} accent="#1a1a1a" />
+          <MetricCard label="Total investment" value={fmtM(totalCost)} sub="across all submissions" accent="#378ADD" />
+          <MetricCard label="Projected annual value" value={fmtM(totalValue)} sub="combined portfolio value" accent="#3a8a64" />
+          <MetricCard label="Portfolio ROI" value={portfolioROI + "%"} sub={"value ÷ investment"} accent={portfolioROI >= 100 ? "#3a8a64" : "#c07820"} />
+        </div>
+
+        {/* Charts row */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1.6fr 1fr", gap:16, marginBottom:24 }}>
+
+          <div style={{ background:C.white, border:"1px solid " + C.border, borderRadius:12, padding:"20px 24px" }}>
+            {loading
+              ? <div style={{ color:C.textLight, fontSize:13 }}>Loading...</div>
+              : <DonutChart title="Stage breakdown" data={stageData} total={rows.length} />
+            }
+          </div>
+
+          <div style={{ background:C.white, border:"1px solid " + C.border, borderRadius:12, padding:"20px 24px" }}>
+            {loading
+              ? <div style={{ color:C.textLight, fontSize:13 }}>Loading...</div>
+              : blData.length > 0
+                ? <BarChart title="Investment by business line" data={blData} formatVal={fmtM} />
+                : <div style={{ color:C.textLight, fontSize:13 }}>No data</div>
+            }
+          </div>
+
+          <div style={{ background:C.white, border:"1px solid " + C.border, borderRadius:12, padding:"20px 24px" }}>
+            {loading
+              ? <div style={{ color:C.textLight, fontSize:13 }}>Loading...</div>
+              : <DonutChart title="AI CoE recommendation" data={recData} total={totalScored || 0} />
+            }
+          </div>
+
+        </div>
+
+        {/* Ranked table */}
+        <div style={{ background:C.white, border:"1px solid " + C.border, borderRadius:12, overflow:"hidden" }}>
+          <div style={{ padding:"16px 20px", borderBottom:"1px solid " + C.border, display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:10 }}>
+            <div style={{ fontSize:14, fontWeight:700, color:C.navy }}>Ranked initiatives</div>
+            <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+              <span style={{ fontSize:12, color:C.textLight }}>Filter:</span>
+              {businessLines.map(bl => (
+                <button key={bl} onClick={() => setFilterBL(bl)} style={{
+                  padding:"4px 12px", fontSize:12, borderRadius:99, cursor:"pointer", fontFamily:"inherit",
+                  border: filterBL===bl ? "1.5px solid #1a1a1a" : "1px solid #ddd",
+                  background: filterBL===bl ? "#1a1a1a" : C.white,
+                  color: filterBL===bl ? "#fff" : C.textMid, fontWeight: filterBL===bl ? 600 : 400,
+                }}>{bl}</button>
+              ))}
+              <span style={{ fontSize:12, color:C.textLight, marginLeft:8 }}>Sort:</span>
+              {[["score","Score"],["cost","Cost"],["value","Value"],["stage","Stage"]].map(([key,label]) => (
+                <button key={key} onClick={() => setSortBy(key)} style={{
+                  padding:"4px 12px", fontSize:12, borderRadius:99, cursor:"pointer", fontFamily:"inherit",
+                  border: sortBy===key ? "1.5px solid #1a1a1a" : "1px solid #ddd",
+                  background: sortBy===key ? "#1a1a1a" : C.white,
+                  color: sortBy===key ? "#fff" : C.textMid, fontWeight: sortBy===key ? 600 : 400,
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
+
+          {loading ? (
+            <div style={{ padding:40, textAlign:"center", color:C.textLight, fontSize:13 }}>Loading portfolio data...</div>
+          ) : tableRows.length === 0 ? (
+            <div style={{ padding:40, textAlign:"center", color:C.textLight, fontSize:13 }}>No initiatives found.</div>
+          ) : (
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", minWidth:900 }}>
+                <thead>
+                  <tr style={{ background:"#fafafa" }}>
+                    <th style={{ ...thStyle(null), cursor:"default", width:40 }}>#</th>
+                    <th style={thStyle(null)}>Initiative</th>
+                    <th style={thStyle("stage")} onClick={() => setSortBy("stage")}>Stage</th>
+                    <th style={thStyle(null)}>Recommendation</th>
+                    <th style={thStyle("score")} onClick={() => setSortBy("score")}>Score</th>
+                    <th style={thStyle("cost")} onClick={() => setSortBy("cost")}>Total cost</th>
+                    <th style={thStyle("value")} onClick={() => setSortBy("value")}>Annual value</th>
+                    <th style={thStyle(null)}>Payback</th>
+                    <th style={thStyle(null)}>Vendor</th>
+                    <th style={thStyle(null)}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows.map((r, i) => (
+                    <tr key={r.id || i} style={{ background: i%2===0 ? C.white : "#fafafa" }}>
+                      <td style={{ ...tdStyle, color:C.textLight, fontWeight:700, width:40 }}>{i+1}</td>
+                      <td style={{ ...tdStyle, minWidth:220 }}>
+                        <div style={{ fontWeight:600, color:C.navy, marginBottom:2 }}>{r.name}</div>
+                        <div style={{ fontSize:11, color:C.textLight }}>{r.business_line} · {r.team}</div>
+                      </td>
+                      <td style={tdStyle}><StagePill stage={r.stage} /></td>
+                      <td style={tdStyle}><RecBadge rec={r.recommendation} /></td>
+                      <td style={tdStyle}><ScoreBar score={r.composite_score} /></td>
+                      <td style={{ ...tdStyle, fontWeight:600 }}>{fmt(r.total_cost)}</td>
+                      <td style={{ ...tdStyle, fontWeight:600, color:"#1a7a3c" }}>{fmt(r.annual_value)}</td>
+                      <td style={tdStyle}>{r.payback_months ? r.payback_months + " mo" : "—"}</td>
+                      <td style={{ ...tdStyle, fontSize:12, color:C.textMid }}>{r.vendor ? r.vendor.split(" ")[0] : "—"}</td>
+                      <td style={tdStyle}>
+                        <div style={{ display:"flex", gap:6 }}>
+                          <a href={"aria-repository.html"} style={{ fontSize:11, padding:"4px 10px", borderRadius:6, border:"1px solid #ddd", color:C.textMid, textDecoration:"none", background:C.white }}>View</a>
+                          <a href={"index.html?edit=" + r.use_case_id} style={{ fontSize:11, padding:"4px 10px", borderRadius:6, border:"1px solid #1a1a1a", color:"#fff", textDecoration:"none", background:"#1a1a1a" }}>Edit</a>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Table footer summary */}
+          {!loading && tableRows.length > 0 && (
+            <div style={{ padding:"12px 20px", borderTop:"1px solid " + C.border, display:"flex", gap:32, flexWrap:"wrap" }}>
+              <div style={{ fontSize:12, color:C.textMid }}>
+                <span style={{ fontWeight:700, color:C.navy }}>{tableRows.length}</span> initiatives shown
+              </div>
+              <div style={{ fontSize:12, color:C.textMid }}>
+                Total investment: <span style={{ fontWeight:700, color:C.navy }}>{fmt(tableRows.reduce((s,r) => s+(parseFloat(r.total_cost)||0), 0))}</span>
+              </div>
+              <div style={{ fontSize:12, color:C.textMid }}>
+                Total annual value: <span style={{ fontWeight:700, color:"#1a7a3c" }}>{fmt(tableRows.reduce((s,r) => s+(parseFloat(r.annual_value)||0), 0))}</span>
+              </div>
+              <div style={{ fontSize:12, color:C.textMid }}>
+                Avg score: <span style={{ fontWeight:700, color:C.navy }}>
+                  {(() => { const scored = tableRows.filter(r => r.composite_score); return scored.length > 0 ? Math.round(scored.reduce((s,r) => s+r.composite_score, 0)/scored.length) + "/100" : "—"; })()}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(ARIADashboard));
+  </script>
+</body>
+</html>
