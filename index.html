@@ -22,7 +22,6 @@ const { useState } = React;
 
 const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 const SCORING_PROMPT = `You are the ARIA prioritization engine for an enterprise AI portfolio management platform at Capital Group, a leading asset management firm.
 
@@ -43,22 +42,17 @@ Respond ONLY with valid JSON, no markdown:
 {"score_strategic_fit":0,"score_expected_impact":0,"score_feasibility":0,"score_cost":0,"score_resource":0,"score_risk":0,"composite_score":0,"recommendation":"Review","score_rationale":{"strategic_fit":"","expected_impact":"","feasibility":"","cost":"","resource":"","risk":""},"score_flags":[],"score_summary":""}`;
 
 async function scoreWithClaude(submissionData) {
-  const response = await fetch(ANTHROPIC_URL, {
+  const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{
-        role: "user",
-        content: SCORING_PROMPT + "\n\nSubmission data:\n" + JSON.stringify(submissionData, null, 2)
-      }]
-    })
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+    },
+    body: JSON.stringify({ submission: submissionData })
   });
-  const data = await response.json();
-  const text = data.content[0].text;
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 async function saveToSupabase(data, id) {
