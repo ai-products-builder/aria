@@ -60,11 +60,19 @@ async function sbFetch() {
 async function sbPatch(uid, data) {
   const res = await fetch(SURL + "/rest/v1/aria_usecases?use_case_id=eq." + uid, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", "apikey": SKEY, "Authorization": "Bearer " + SKEY, "Prefer": "return=representation" },
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SKEY,
+      "Authorization": "Bearer " + SKEY,
+      "Prefer": "return=minimal",
+    },
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error("Supabase patch failed: " + errText);
+  }
+  return true;
 }
 
 const C = {
@@ -454,7 +462,20 @@ function ARIARepository() {
     try {
       const data = sub.raw || sub;
       const scores = await callClaude(data);
-      const patch = { ...scores, scored_at: new Date().toISOString() };
+      const patch = {
+        score_strategic_fit: scores.score_strategic_fit,
+        score_expected_impact: scores.score_expected_impact,
+        score_feasibility: scores.score_feasibility,
+        score_cost: scores.score_cost,
+        score_resource: scores.score_resource,
+        score_risk: scores.score_risk,
+        composite_score: scores.composite_score,
+        recommendation: scores.recommendation,
+        score_rationale: scores.score_rationale,
+        score_summary: scores.score_summary,
+        score_flags: scores.score_flags,
+        scored_at: new Date().toISOString(),
+      };
       await sbPatch(sub.id, patch);
       const updated = { ...sub, ...patch };
       setSubs(prev => prev.map(s => s.id === sub.id ? updated : s));
