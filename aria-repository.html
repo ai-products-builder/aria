@@ -58,7 +58,10 @@ async function sbFetch() {
 }
 
 async function sbPatch(uid, data) {
-  const res = await fetch(SURL + "/rest/v1/aria_usecases?use_case_id=eq." + uid, {
+  const url = SURL + "/rest/v1/aria_usecases?use_case_id=eq." + uid;
+  console.log("PATCH URL:", url);
+  console.log("PATCH data keys:", Object.keys(data));
+  const res = await fetch(url, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -68,10 +71,13 @@ async function sbPatch(uid, data) {
     },
     body: JSON.stringify(data)
   });
+  console.log("PATCH status:", res.status, res.statusText);
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error("Supabase patch failed: " + errText);
+    console.error("PATCH error body:", errText);
+    throw new Error("Supabase patch failed (" + res.status + "): " + errText);
   }
+  console.log("PATCH success for", uid);
   return true;
 }
 
@@ -460,8 +466,11 @@ function ARIARepository() {
   async function handleRescore(sub) {
     setRescoring(true);
     try {
+      console.log("1. handleRescore called for:", sub.id);
       const data = sub.raw || sub;
+      console.log("2. calling Claude...");
       const scores = await callClaude(data);
+      console.log("3. Claude returned scores:", JSON.stringify(scores).substring(0, 100));
       const patch = {
         score_strategic_fit: scores.score_strategic_fit,
         score_expected_impact: scores.score_expected_impact,
@@ -476,11 +485,14 @@ function ARIARepository() {
         score_flags: scores.score_flags,
         scored_at: new Date().toISOString(),
       };
+      console.log("4. calling sbPatch for uid:", sub.id);
       await sbPatch(sub.id, patch);
+      console.log("5. sbPatch done, updating state");
       const updated = { ...sub, ...patch };
       setSubs(prev => prev.map(s => s.id === sub.id ? updated : s));
       setSelected(updated);
-    } catch(e) { alert("Rescore failed: " + e.message); }
+      console.log("6. all done");
+    } catch(e) { console.error("Rescore error at step:", e); alert("Rescore failed: " + e.message); }
     finally { setRescoring(false); }
   }
 
