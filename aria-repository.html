@@ -36,17 +36,17 @@ RECOMMENDATION: Prioritize>=70, Review 45-69, Deprioritize<45
 Return ONLY valid JSON no markdown: {"score_strategic_fit":0,"score_expected_impact":0,"score_feasibility":0,"score_cost":0,"score_resource":0,"score_risk":0,"composite_score":0,"recommendation":"Review","score_rationale":{"strategic_fit":"","expected_impact":"","feasibility":"","cost":"","resource":"","risk":""},"score_flags":[],"score_summary":""}`;
 
 async function callClaude(data) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: SCORE_PROMPT + "\n\nData:\n" + JSON.stringify(data) }]
-    })
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+    },
+    body: JSON.stringify({ submission: data })
   });
-  const d = await res.json();
-  return JSON.parse(d.content[0].text.replace(/```json|```/g, "").trim());
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 async function sbFetch() {
