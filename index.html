@@ -60,17 +60,19 @@ async function saveToSupabase(data, id) {
     ? `${SUPABASE_URL}/rest/v1/aria_usecases?use_case_id=eq.${id}`
     : `${SUPABASE_URL}/rest/v1/aria_usecases`;
   const method = id ? "PATCH" : "POST";
+  const prefer = id ? "return=minimal" : "return=representation";
   const res = await fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
       "apikey": SUPABASE_KEY,
       "Authorization": `Bearer ${SUPABASE_KEY}`,
-      "Prefer": "return=representation",
+      "Prefer": prefer,
     },
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(await res.text());
+  if (method === "PATCH") return true;
   return res.json();
 }
 
@@ -378,7 +380,20 @@ function ARIAIntakeForm({ editData, onSaved }) {
       setSavingStage("Scoring with Claude AI...");
       const scores = await scoreWithClaude(payload);
       setSavingStage("Saving scores...");
-      await saveToSupabase({ ...scores, scored_at: new Date().toISOString() }, useCaseId);
+      await saveToSupabase({
+        score_strategic_fit: scores.score_strategic_fit,
+        score_expected_impact: scores.score_expected_impact,
+        score_feasibility: scores.score_feasibility,
+        score_cost: scores.score_cost,
+        score_resource: scores.score_resource,
+        score_risk: scores.score_risk,
+        composite_score: scores.composite_score,
+        recommendation: scores.recommendation,
+        score_rationale: scores.score_rationale,
+        score_summary: scores.score_summary,
+        score_flags: scores.score_flags,
+        scored_at: new Date().toISOString(),
+      }, useCaseId);
       setScoreResult(scores);
       setSubmitted(true);
       if (onSaved) onSaved();
