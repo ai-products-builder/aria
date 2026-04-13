@@ -50,6 +50,75 @@ const BL_COLORS = ["#1a1a1a","#555","#888","#bbb","#378ADD","#3a8a64","#c07820",
 function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
 function fmtM(v) { return v >= 1000000 ? "$" + (v/1000000).toFixed(1) + "M" : v >= 1000 ? "$" + (v/1000).toFixed(0) + "K" : fmt(v); }
 
+async function generateBriefing(rows) {
+  const summary = {
+    total: rows.length,
+    totalCost: rows.reduce((s,r) => s+(parseFloat(r.total_cost)||0),0),
+    totalValue: rows.reduce((s,r) => s+(parseFloat(r.annual_value)||0),0),
+    totalNetProfit: rows.reduce((s,r) => s+((parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0)),0),
+    byStage: {},
+    byBL: {},
+    byRec: { Prioritize:[], Review:[], Deprioritize:[], Unscored:[] },
+    topByScore: [...rows].sort((a,b)=>(b.composite_score||0)-(a.composite_score||0)).slice(0,5).map(r=>({
+      name:r.name, bl:r.business_line, score:r.composite_score, rec:r.recommendation,
+      value:r.annual_value, cost:r.total_cost, stage:r.stage, flags:r.score_flags
+    })),
+    topByNetProfit: [...rows].sort((a,b)=>((parseFloat(b.annual_value)||0)-(parseFloat(b.total_cost)||0))-((parseFloat(a.annual_value)||0)-(parseFloat(a.total_cost)||0))).slice(0,5).map(r=>({
+      name:r.name, bl:r.business_line, netProfit:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0), value:r.annual_value, cost:r.total_cost
+    })),
+    riskFlags: rows.filter(r=>r.score_flags && r.score_flags.length>0).map(r=>({name:r.name,flags:r.score_flags})),
+    legalNotStarted: rows.filter(r=>r.legal_needed==="Yes" && r.legal_status==="Not yet started").map(r=>r.name),
+    highRisk: rows.filter(r=>r.model_risk && r.model_risk.toLowerCase().includes("high") || r.model_risk && r.model_risk.toLowerCase().includes("critical")).map(r=>r.name),
+    unscored: rows.filter(r=>!r.composite_score).map(r=>r.name),
+  };
+  rows.forEach(r => {
+    summary.byStage[r.stage] = (summary.byStage[r.stage]||0)+1;
+    const bl = r.business_line||"Unknown";
+    if(!summary.byBL[bl]) summary.byBL[bl]={count:0,cost:0,value:0};
+    summary.byBL[bl].count++;
+    summary.byBL[bl].cost += parseFloat(r.total_cost)||0;
+    summary.byBL[bl].value += parseFloat(r.annual_value)||0;
+    if(r.recommendation) summary.byRec[r.recommendation].push(r.name);
+    else summary.byRec.Unscored.push(r.name);
+  });
+
+  const prompt = `You are the ARIA AI portfolio intelligence engine for Capital Group. You are generating a concise, polished executive board briefing for senior leadership and the AI Steering Committee.
+
+Based on the portfolio data below, write a structured board briefing with these sections:
+
+1. PORTFOLIO SNAPSHOT — 2-3 sentences on the overall state of the AI portfolio: total initiatives, investment, projected value, and net returns.
+
+2. TOP PRIORITIES THIS QUARTER — The 3 initiatives leadership should accelerate, with a one-line rationale each based on score, net profit, and strategic fit.
+
+3. WHERE VALUE IS BEING CREATED — Which business lines are generating the strongest projected returns. Be specific with numbers.
+
+4. RISKS REQUIRING IMMEDIATE ATTENTION — Call out initiatives with high model risk, unstarted legal reviews, or low scores despite significant investment. Be direct.
+
+5. PORTFOLIO RECOMMENDATIONS — 3 concrete actions the AI CoE should take this quarter to maximize portfolio value. Be specific and actionable.
+
+6. WHAT'S WORKING — One success story from the highest-scoring initiative. Write this as a compelling narrative for a CFO or board member.
+
+Write in a confident, senior executive tone. Use specific numbers. No bullet soup — write in short paragraphs. Keep the entire briefing under 500 words. This will be read by a CFO, CIO, and AI Steering Committee.
+
+PORTFOLIO DATA:
+${JSON.stringify(summary, null, 2)}`;
+
+  const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+    },
+    body: JSON.stringify({ submission: { __briefing_mode: true, prompt_override: prompt, portfolio: summary } })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  // The edge function returns scored JSON normally, but we're abusing it for text
+  // We need a different approach - call via a raw text response
+  return data;
+}
+
 async function fetchAll() {
   const res = await fetch(SURL + "/rest/v1/aria_usecases?select=*&order=composite_score.desc.nullslast", {
     headers: { "apikey": SKEY, "Authorization": "Bearer " + SKEY }
@@ -170,6 +239,88 @@ function ARIADashboard() {
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState("score");
   const [filterBL, setFilterBL] = useState("All");
+  const [briefing, setBriefing] = useState(null);
+  const [briefingLoading, setBriefingLoading] = useState(false);
+  const [showBriefing, setShowBriefing] = useState(false);
+
+  async function handleGenerateBriefing() {
+    setBriefingLoading(true);
+    setShowBriefing(true);
+    setBriefing(null);
+    try {
+      const totalCost = rows.reduce((s,r)=>s+(parseFloat(r.total_cost)||0),0);
+      const totalValue = rows.reduce((s,r)=>s+(parseFloat(r.annual_value)||0),0);
+      const totalNet = totalValue - totalCost;
+      const portfolioROI = totalCost > 0 ? Math.round((totalValue/totalCost)*100) : 0;
+      const byStage = {};
+      const byBL = {};
+      rows.forEach(r => {
+        byStage[r.stage]=(byStage[r.stage]||0)+1;
+        const bl=r.business_line||"Unknown";
+        if(!byBL[bl]) byBL[bl]={count:0,cost:0,value:0};
+        byBL[bl].count++; byBL[bl].cost+=parseFloat(r.total_cost)||0; byBL[bl].value+=parseFloat(r.annual_value)||0;
+      });
+      const top3 = [...rows].filter(r=>r.composite_score).sort((a,b)=>(b.composite_score||0)-(a.composite_score||0)).slice(0,3).map(r=>({name:r.name,bl:r.business_line,score:r.composite_score,rec:r.recommendation,value:r.annual_value,cost:r.total_cost,netProfit:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0),stage:r.stage,flags:r.score_flags,summary:r.score_summary}));
+      const highRisk = rows.filter(r=>r.model_risk&&(r.model_risk.includes("High")||r.model_risk.includes("Critical"))).map(r=>r.name);
+      const legalGap = rows.filter(r=>r.legal_needed==="Yes"&&r.legal_status==="Not yet started").map(r=>r.name);
+      const unscored = rows.filter(r=>!r.composite_score).map(r=>r.name);
+      const deprioritize = rows.filter(r=>r.recommendation==="Deprioritize").map(r=>({name:r.name,cost:r.total_cost}));
+
+      const portfolioData = {
+        totalInitiatives: rows.length, totalCost, totalValue, totalNet, portfolioROI,
+        byStage, byBL, top3, highRisk, legalGap, unscored, deprioritize,
+        scoredCount: rows.filter(r=>r.composite_score).length,
+        prioritizeCount: rows.filter(r=>r.recommendation==="Prioritize").length,
+        reviewCount: rows.filter(r=>r.recommendation==="Review").length,
+        deprioritizeCount: rows.filter(r=>r.recommendation==="Deprioritize").length,
+      };
+
+      const briefingPrompt = `You are the ARIA AI portfolio intelligence engine for Capital Group. Generate a concise polished executive board briefing for the AI Steering Committee and CFO.
+
+Write EXACTLY these 6 sections with these headers (use ## for headers):
+
+## Portfolio snapshot
+2-3 sentences: total initiatives, total investment, projected annual value, net returns, portfolio ROI.
+
+## Top priorities this quarter
+The top 3 initiatives to accelerate. For each: name, score, why it should be prioritized. One short paragraph total.
+
+## Where value is being created
+Which business lines show strongest projected returns. Use specific dollar figures.
+
+## Risks requiring immediate attention
+Call out: high model risk initiatives, unstarted legal reviews on legally-required cases, unscored initiatives with significant investment. Be direct and specific.
+
+## Portfolio recommendations
+3 concrete actions the AI CoE should take this quarter. Specific and actionable.
+
+## Success story
+One compelling narrative about the top-scoring initiative for a CFO audience. 2-3 sentences maximum.
+
+Tone: confident senior executive. Use specific numbers. Short paragraphs not bullet lists. Under 450 words total.
+
+LIVE PORTFOLIO DATA:
+` + JSON.stringify(portfolioData, null, 2);
+
+      const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+        },
+        body: JSON.stringify({ submission: { __briefing: true, prompt_override: briefingPrompt } })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setBriefing(data.briefing || "No briefing generated.");
+    } catch(e) {
+      setBriefing("Error generating briefing: " + e.message);
+    } finally {
+      setBriefingLoading(false);
+    }
+  }
 
   useEffect(() => {
     fetchAll()
@@ -266,9 +417,48 @@ function ARIADashboard() {
               {loading ? "Loading..." : rows.length + " initiatives · " + scoredCount + " scored · Last updated " + new Date().toLocaleDateString()}
             </div>
           </div>
+          <button onClick={handleGenerateBriefing} disabled={loading || rows.length===0} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", border:"none", borderRadius:10, background:"#1a1a1a", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+            <span style={{ fontSize:16 }}>✦</span> Generate board briefing
+          </button>
         </div>
 
-        {error && (
+        {showBriefing && (
+          <div style={{ background:"#fff", border:"1px solid #e0e0e0", borderRadius:16, padding:"28px 32px", marginBottom:24, position:"relative" }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <span style={{ fontSize:18 }}>✦</span>
+                <div>
+                  <div style={{ fontSize:16, fontWeight:800, color:C.navy }}>AI CoE Board Briefing</div>
+                  <div style={{ fontSize:12, color:C.textLight }}>Generated by ARIA · {new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})}</div>
+                </div>
+              </div>
+              <button onClick={()=>setShowBriefing(false)} style={{ background:"none", border:"none", cursor:"pointer", fontSize:20, color:C.textLight, padding:"4px 8px" }}>×</button>
+            </div>
+            {briefingLoading && (
+              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"24px 0", color:C.textMid }}>
+                <div style={{ width:20, height:20, border:"2px solid #ddd", borderTopColor:"#1a1a1a", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+                <span style={{ fontSize:14 }}>Claude is analysing your portfolio and writing the board briefing...</span>
+              </div>
+            )}
+            {briefing && !briefingLoading && (
+              <div style={{ fontSize:14, lineHeight:1.8, color:C.text }}>
+                {briefing.split("\n").map((line, i) => {
+                  if(line.startsWith("## ")) return <div key={i} style={{ fontSize:13, fontWeight:700, color:"#555", textTransform:"uppercase", letterSpacing:"0.07em", marginTop:i>0?20:0, marginBottom:6, paddingBottom:4, borderBottom:"1px solid #f0f0f0" }}>{line.replace("## ","")}</div>;
+                  if(line.trim()==="") return <div key={i} style={{ height:6 }} />;
+                  return <div key={i} style={{ marginBottom:4 }}>{line}</div>;
+                })}
+                <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid #f0f0f0", display:"flex", gap:10 }}>
+                  <button onClick={()=>{ const el=document.createElement("textarea"); el.value=briefing; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); alert("Briefing copied to clipboard"); }} style={{ padding:"8px 16px", border:"1px solid #ccc", borderRadius:8, background:"#fff", color:C.navy, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Copy text</button>
+                  <button onClick={handleGenerateBriefing} style={{ padding:"8px 16px", border:"none", borderRadius:8, background:"#1a1a1a", color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Regenerate</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+                {error && (
           <div style={{ padding:"14px 18px", background:"#fce8e8", border:"1px solid #f0a0a0", borderRadius:10, color:"#a01a1a", fontSize:13, marginBottom:20 }}>
             Failed to load data: {error}
           </div>
