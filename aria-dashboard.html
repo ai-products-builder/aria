@@ -172,6 +172,109 @@ function ARIADashboard() {
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState("score");
   const [filterBL, setFilterBL] = useState("All");
+
+  // ── Ask ARIA state ─────────────────────────────────────────────────────────
+  const [ariaOpen, setAriaOpen] = useState(false);
+  const [ariaMessages, setAriaMessages] = useState([]);
+  const [ariaInput, setAriaInput] = useState("");
+  const [ariaLoading, setAriaLoading] = useState(false);
+  const ariaEndRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (ariaEndRef.current) ariaEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [ariaMessages, ariaLoading]);
+
+  const STARTERS = [
+    "Which initiatives should I prioritize if I only have $500K budget left this quarter?",
+    "Which business line has the highest projected ROI?",
+    "Show me all initiatives with client data exposed but legal review not started",
+    "What are the biggest risks across the portfolio right now?",
+    "Which initiatives are blocked and what would unblock them?",
+    "Compare the net profit of Live vs In development initiatives",
+    "Which vendor appears most across our portfolio?",
+    "What\'s the average score by business line?",
+  ];
+
+  async function handleAskAria(question) {
+    if (!question.trim() || ariaLoading) return;
+    const userMsg = { role: "user", text: question };
+    setAriaMessages(prev => [...prev, userMsg]);
+    setAriaInput("");
+    setAriaLoading(true);
+
+    try {
+      // Build portfolio context
+      const portfolioContext = rows.map(r => ({
+        id: r.use_case_id, name: r.name, stage: r.stage,
+        businessLine: r.business_line, team: r.team,
+        vendor: r.vendor, totalCost: r.total_cost,
+        annualValue: r.annual_value, netProfit: (parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0),
+        paybackMonths: r.payback_months, returnType: r.return_type,
+        compositeScore: r.composite_score, recommendation: r.recommendation,
+        scoreSummary: r.score_summary, scoreFlags: r.score_flags,
+        pillars: r.pillars, roadmap: r.roadmap,
+        dataClass: r.data_class, clientData: r.client_data,
+        regs: r.regs, modelRisk: r.model_risk,
+        legalNeeded: r.legal_needed, legalStatus: r.legal_status,
+        sponsor: r.sponsor, owner: r.owner,
+        startDate: r.start_date, goLiveDate: r.go_live_date,
+        kpiCats: r.kpi_cats, realizationOwner: r.realization_owner,
+        constraints: r.constraints,
+      }));
+
+      // Build conversation history for context
+      const history = ariaMessages.slice(-6).map(m => ({
+        role: m.role === "user" ? "user" : "assistant",
+        content: m.text
+      }));
+
+      const systemPrompt = `You are ARIA, an enterprise AI portfolio intelligence assistant. You have access to the firm\'s complete AI initiative portfolio data. Answer questions concisely and precisely using the portfolio data provided.
+
+Rules:
+- Always use specific numbers, IDs, and names from the data
+- Use markdown tables when comparing multiple initiatives
+- Be direct — no preamble, no "Great question!", just the answer
+- If asked to rank or compare, do it with a table
+- If data doesn\'t support the answer, say so clearly
+- Never mention any specific firm or company name — say "the firm" or "the portfolio"
+- Keep answers under 300 words unless a detailed table is needed
+- Format currency as $X,XXX or $XM for millions
+
+PORTFOLIO DATA (${rows.length} initiatives):
+${JSON.stringify(portfolioContext, null, 2)}`;
+
+      const messages = [
+        ...history,
+        { role: "user", content: question }
+      ];
+
+      const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
+        },
+        body: JSON.stringify({
+          submission: {
+            __briefing: true,
+            prompt_override: systemPrompt + "\n\nConversation so far:\n" + history.map(m=>m.role+": "+m.content).join("\n") + "\n\nUser question: " + question
+          }
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      setAriaMessages(prev => [...prev, { role: "aria", text: data.briefing || "No response." }]);
+    } catch(e) {
+      setAriaMessages(prev => [...prev, { role: "aria", text: "Error: " + e.message }]);
+    } finally {
+      setAriaLoading(false);
+    }
+  }
+
   const [briefing, setBriefing] = useState(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
@@ -267,7 +370,7 @@ function ARIADashboard() {
         top3ByScore: [...rows].filter(r=>r.composite_score).sort((a,b)=>b.composite_score-a.composite_score).slice(0,3).map(r=>({id:r.use_case_id,name:r.name,score:r.composite_score,rec:r.recommendation,value:r.annual_value,netProfit:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0)})),
       };
 
-      const prompt = `You are ARIA, the AI portfolio intelligence engine. Generate a punchy, executive-quality briefing for the AI Steering Committee and CFO. Do NOT mention any specific firm or company name — refer to the organization as "the firm" or "the portfolio."
+      const prompt = `You are ARIA, the AI portfolio intelligence engine. Generate a punchy, executive-quality Executive Briefing for the AI Steering Committee and CFO. Do NOT mention any specific firm or company name — refer to the organization as "the firm" or "the portfolio."
 
 Write EXACTLY these sections with these markdown headers:
 
@@ -417,10 +520,10 @@ PORTFOLIO DATA:
             <div style={{ width:26, height:26, borderRadius:7, background:"rgba(255,255,255,0.15)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:"#fff" }}>A</div>
             <span style={{ fontSize:14, fontWeight:700, color:"#fff", letterSpacing:"0.05em" }}>ARIA</span>
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.3)", margin:"0 6px" }}>·</span>
-            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>Portfolio dashboard</span>
+            <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>AI Portfolio Overview</span>
           </div>
           <div style={{ display:"flex", gap:20 }}>
-            {[["+ New intake","index.html"],["Repository","aria-repository.html"],["Dashboard","aria-dashboard.html"]].map(([label, href]) => (
+            {[["+ New intake","index.html"],["Repository","aria-repository.html"],["AI Portfolio Overview","aria-dashboard.html"]].map(([label, href]) => (
               <a key={href} href={href} style={{ fontSize:13, color: href==="aria-dashboard.html" ? "#fff" : "rgba(255,255,255,0.55)", textDecoration:"none", fontWeight: href==="aria-dashboard.html" ? 700 : 400 }}>{label}</a>
             ))}
           </div>
@@ -437,9 +540,14 @@ PORTFOLIO DATA:
               {loading ? "Loading..." : rows.length + " initiatives · " + scoredCount + " scored · Last updated " + new Date().toLocaleDateString()}
             </div>
           </div>
-          <button onClick={handleGenerateBriefing} disabled={loading || rows.length===0} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", border:"none", borderRadius:10, background:"#1a1a1a", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
-            <span style={{ fontSize:16 }}>✦</span> Generate Executive Briefing
-          </button>
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={handleGenerateBriefing} disabled={loading || rows.length===0} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", border:"none", borderRadius:10, background:"#f0f0f0", color:"#1a1a1a", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+              <span style={{ fontSize:16 }}>✦</span> Generate Executive Briefing
+            </button>
+            <button onClick={()=>setAriaOpen(true)} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 20px", border:"none", borderRadius:10, background:"#1a1a1a", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", fontFamily:"inherit", flexShrink:0 }}>
+              <span style={{ fontSize:16 }}>◈</span> Ask ARIA
+            </button>
+          </div>
         </div>
 
         {showBriefing && (
@@ -457,7 +565,7 @@ PORTFOLIO DATA:
             {briefingLoading && (
               <div style={{ display:"flex", alignItems:"center", gap:12, padding:"24px 0", color:C.textMid }}>
                 <div style={{ width:20, height:20, border:"2px solid #ddd", borderTopColor:"#1a1a1a", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
-                <span style={{ fontSize:14 }}>Claude is analysing your portfolio and writing the executive briefing...</span>
+                <span style={{ fontSize:14 }}>Claude is analysing your portfolio and writing the Executive Briefing...</span>
               </div>
             )}
             {briefing && !briefingLoading && (
@@ -514,7 +622,125 @@ PORTFOLIO DATA:
           </div>
         )}
 
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  
+      {/* Ask ARIA Panel */}
+      {ariaOpen && (
+        <div style={{ position:"fixed", top:0, right:0, width:420, height:"100vh", background:"#fff", borderLeft:"1px solid #e0e0e0", display:"flex", flexDirection:"column", zIndex:1000, boxShadow:"-4px 0 24px rgba(0,0,0,0.08)" }}>
+
+          {/* Header */}
+          <div style={{ background:"#1a1a1a", padding:"16px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:18, color:"#fff" }}>◈</span>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700, color:"#fff" }}>Ask ARIA</div>
+                <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)" }}>{rows.length} initiatives loaded · ask anything</div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={()=>setAriaMessages([])} style={{ background:"rgba(255,255,255,0.1)", border:"none", borderRadius:6, padding:"4px 10px", color:"rgba(255,255,255,0.6)", fontSize:11, cursor:"pointer", fontFamily:"inherit" }}>Clear</button>
+              <button onClick={()=>setAriaOpen(false)} style={{ background:"none", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.6)", fontSize:20, padding:"0 4px", lineHeight:1 }}>×</button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex:1, overflowY:"auto", padding:"16px", display:"flex", flexDirection:"column", gap:12 }}>
+
+            {ariaMessages.length === 0 && (
+              <div>
+                <div style={{ fontSize:13, color:"#999", marginBottom:14, textAlign:"center" }}>Ask anything about your AI portfolio</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {STARTERS.map((s,i) => (
+                    <button key={i} onClick={()=>handleAskAria(s)} style={{ textAlign:"left", padding:"10px 12px", background:"#f8f8f8", border:"1px solid #e8e8e8", borderRadius:10, cursor:"pointer", fontFamily:"inherit", fontSize:12, color:"#333", lineHeight:1.5 }}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {ariaMessages.map((msg, i) => (
+              <div key={i} style={{ display:"flex", flexDirection:"column", alignItems:msg.role==="user"?"flex-end":"flex-start" }}>
+                {msg.role === "aria" && (
+                  <div style={{ fontSize:10, fontWeight:700, color:"#999", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:4 }}>ARIA</div>
+                )}
+                <div style={{
+                  maxWidth:"92%", padding:"10px 14px", borderRadius:12,
+                  background: msg.role==="user" ? "#1a1a1a" : "#f5f5f5",
+                  color: msg.role==="user" ? "#fff" : "#1a1a1a",
+                  fontSize:13, lineHeight:1.6,
+                  borderBottomRightRadius: msg.role==="user" ? 4 : 12,
+                  borderBottomLeftRadius: msg.role==="aria" ? 4 : 12,
+                }}>
+                  {msg.role === "aria" ? (
+                    <div>
+                      {msg.text.split("\n").map((line, li) => {
+                        if(line.match(/^\|[\s-|]+\|$/)) return null;
+                        if(line.startsWith("|") && line.endsWith("|")) {
+                          const cells = line.split("|").filter(c=>c.trim()!=="");
+                          return (
+                            <div key={li} style={{ display:"grid", gridTemplateColumns:"repeat("+cells.length+",1fr)", gap:0, borderBottom:"1px solid #e8e8e8", fontSize:11 }}>
+                              {cells.map((cell,ci) => (
+                                <div key={ci} style={{ padding:"4px 6px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{cell.trim()}</div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        if(line.startsWith("## ") || line.startsWith("### ")) return <div key={li} style={{ fontWeight:700, marginTop:8, marginBottom:4, fontSize:12 }}>{line.replace(/^#+\s/,"")}</div>;
+                        if(line.trim()==="") return <div key={li} style={{ height:4 }} />;
+                        const parts = line.split(/\*\*(.*?)\*\*/g);
+                        return <div key={li}>{parts.map((p,pi)=>pi%2===1?<strong key={pi}>{p}</strong>:<span key={pi}>{p}</span>)}</div>;
+                      })}
+                    </div>
+                  ) : msg.text}
+                </div>
+              </div>
+            ))}
+
+            {ariaLoading && (
+              <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:"#f5f5f5", borderRadius:12, borderBottomLeftRadius:4, width:"fit-content" }}>
+                <div style={{ display:"flex", gap:4 }}>
+                  {[0,1,2].map(i => (
+                    <div key={i} style={{ width:6, height:6, borderRadius:"50%", background:"#999", animation:"bounce 1s ease-in-out infinite", animationDelay:(i*0.15)+"s" }} />
+                  ))}
+                </div>
+                <span style={{ fontSize:12, color:"#999" }}>ARIA is thinking...</span>
+              </div>
+            )}
+
+            <div ref={ariaEndRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ padding:"12px 16px", borderTop:"1px solid #e8e8e8", flexShrink:0 }}>
+            {ariaMessages.length > 0 && (
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:8 }}>
+                {["Top ROI initiatives","Blocked initiatives","Risk summary"].map(s => (
+                  <button key={s} onClick={()=>handleAskAria(s)} style={{ padding:"3px 10px", fontSize:11, borderRadius:99, border:"1px solid #e0e0e0", background:"#fff", color:"#555", cursor:"pointer", fontFamily:"inherit" }}>{s}</button>
+                ))}
+              </div>
+            )}
+            <div style={{ display:"flex", gap:8 }}>
+              <input
+                type="text"
+                value={ariaInput}
+                onChange={e=>setAriaInput(e.target.value)}
+                onKeyDown={e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); handleAskAria(ariaInput); }}}
+                placeholder="Ask about your portfolio..."
+                style={{ flex:1, padding:"10px 12px", border:"1px solid #e0e0e0", borderRadius:10, fontSize:13, fontFamily:"inherit", outline:"none", background:"#fafafa" }}
+              />
+              <button onClick={()=>handleAskAria(ariaInput)} disabled={ariaLoading || !ariaInput.trim()} style={{ padding:"10px 16px", background:ariaLoading||!ariaInput.trim()?"#ccc":"#1a1a1a", border:"none", borderRadius:10, color:"#fff", fontSize:13, fontWeight:700, cursor:ariaLoading||!ariaInput.trim()?"default":"pointer", fontFamily:"inherit" }}>→</button>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-6px); }
+        }
+      `}</style>
+
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
                 {error && (
           <div style={{ padding:"14px 18px", background:"#fce8e8", border:"1px solid #f0a0a0", borderRadius:10, color:"#a01a1a", fontSize:13, marginBottom:20 }}>
