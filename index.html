@@ -23,7 +23,7 @@ const { useState } = React;
 const SUPABASE_URL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
 
-const SCORING_PROMPT = `You are the ARIA prioritization engine for an enterprise AI portfolio management platform.
+const SCORING_PROMPT = `You are the ARIA prioritization engine for an enterprise AI portfolio management platform at Capital Group, a leading asset management firm.
 
 Score this AI initiative across 6 dimensions (each 1-5):
 
@@ -486,8 +486,9 @@ function ARIAIntakeForm({ editData, onSaved }) {
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.35)", margin:"0 6px" }}>·</span>
             <span style={{ fontSize:13, color:"rgba(255,255,255,0.55)" }}>{isEdit ? "Edit initiative" : "New AI initiative intake"}</span>
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <a href="aria-repository.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>View repository →</a>
+          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+            <a href="aria-repository.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>Repository</a>
+            <a href="aria-dashboard.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>AI Portfolio Overview</a>
             <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,255,255,0.12)", borderRadius:8, padding:"5px 12px" }}>
               <span style={{ fontSize:10, color:"rgba(255,255,255,0.6)", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em" }}>ID</span>
               <span style={{ fontSize:12, fontFamily:"monospace", fontWeight:700, color:"#fff" }}>{useCaseId}</span>
