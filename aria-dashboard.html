@@ -50,74 +50,7 @@ const BL_COLORS = ["#1a1a1a","#555","#888","#bbb","#378ADD","#3a8a64","#c07820",
 function fmt(v) { return v > 0 ? "$" + Math.round(v).toLocaleString() : "—"; }
 function fmtM(v) { return v >= 1000000 ? "$" + (v/1000000).toFixed(1) + "M" : v >= 1000 ? "$" + (v/1000).toFixed(0) + "K" : fmt(v); }
 
-async function generateBriefing(rows) {
-  const summary = {
-    total: rows.length,
-    totalCost: rows.reduce((s,r) => s+(parseFloat(r.total_cost)||0),0),
-    totalValue: rows.reduce((s,r) => s+(parseFloat(r.annual_value)||0),0),
-    totalNetProfit: rows.reduce((s,r) => s+((parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0)),0),
-    byStage: {},
-    byBL: {},
-    byRec: { Prioritize:[], Review:[], Deprioritize:[], Unscored:[] },
-    topByScore: [...rows].sort((a,b)=>(b.composite_score||0)-(a.composite_score||0)).slice(0,5).map(r=>({
-      name:r.name, bl:r.business_line, score:r.composite_score, rec:r.recommendation,
-      value:r.annual_value, cost:r.total_cost, stage:r.stage, flags:r.score_flags
-    })),
-    topByNetProfit: [...rows].sort((a,b)=>((parseFloat(b.annual_value)||0)-(parseFloat(b.total_cost)||0))-((parseFloat(a.annual_value)||0)-(parseFloat(a.total_cost)||0))).slice(0,5).map(r=>({
-      name:r.name, bl:r.business_line, netProfit:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0), value:r.annual_value, cost:r.total_cost
-    })),
-    riskFlags: rows.filter(r=>r.score_flags && r.score_flags.length>0).map(r=>({name:r.name,flags:r.score_flags})),
-    legalNotStarted: rows.filter(r=>r.legal_needed==="Yes" && r.legal_status==="Not yet started").map(r=>r.name),
-    highRisk: rows.filter(r=>r.model_risk && r.model_risk.toLowerCase().includes("high") || r.model_risk && r.model_risk.toLowerCase().includes("critical")).map(r=>r.name),
-    unscored: rows.filter(r=>!r.composite_score).map(r=>r.name),
-  };
-  rows.forEach(r => {
-    summary.byStage[r.stage] = (summary.byStage[r.stage]||0)+1;
-    const bl = r.business_line||"Unknown";
-    if(!summary.byBL[bl]) summary.byBL[bl]={count:0,cost:0,value:0};
-    summary.byBL[bl].count++;
-    summary.byBL[bl].cost += parseFloat(r.total_cost)||0;
-    summary.byBL[bl].value += parseFloat(r.annual_value)||0;
-    if(r.recommendation) summary.byRec[r.recommendation].push(r.name);
-    else summary.byRec.Unscored.push(r.name);
-  });
 
-  const prompt = `You are the ARIA AI portfolio intelligence engine. You are generating a concise, polished executive board briefing for senior leadership and the AI Steering Committee.
-
-Based on the portfolio data below, write a structured board briefing with these sections:
-
-1. PORTFOLIO SNAPSHOT — 2-3 sentences on the overall state of the AI portfolio: total initiatives, investment, projected value, and net returns.
-
-2. TOP PRIORITIES THIS QUARTER — The 3 initiatives leadership should accelerate, with a one-line rationale each based on score, net profit, and strategic fit.
-
-3. WHERE VALUE IS BEING CREATED — Which business lines are generating the strongest projected returns. Be specific with numbers.
-
-4. RISKS REQUIRING IMMEDIATE ATTENTION — Call out initiatives with high model risk, unstarted legal reviews, or low scores despite significant investment. Be direct.
-
-5. PORTFOLIO RECOMMENDATIONS — 3 concrete actions the AI CoE should take this quarter to maximize portfolio value. Be specific and actionable.
-
-6. WHAT'S WORKING — One success story from the highest-scoring initiative. Write this as a compelling narrative for a CFO or board member.
-
-Write in a confident, senior executive tone. Use specific numbers. No bullet soup — write in short paragraphs. Keep the entire briefing under 500 words. This will be read by a CFO, CIO, and AI Steering Committee.
-
-PORTFOLIO DATA:
-${JSON.stringify(summary, null, 2)}`;
-
-  const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
-      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
-    },
-    body: JSON.stringify({ submission: { __briefing_mode: true, prompt_override: prompt, portfolio: summary } })
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  // The edge function returns scored JSON normally, but we're abusing it for text
-  // We need a different approach - call via a raw text response
-  return data;
-}
 
 async function fetchAll() {
   const res = await fetch(SURL + "/rest/v1/aria_usecases?select=*&order=composite_score.desc.nullslast", {
@@ -243,7 +176,7 @@ function ARIADashboard() {
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [showBriefing, setShowBriefing] = useState(false);
 
-  async function handleGenerateBriefing() {
+    async function handleGenerateBriefing() {
     setBriefingLoading(true);
     setShowBriefing(true);
     setBriefing(null);
@@ -252,54 +185,141 @@ function ARIADashboard() {
       const totalValue = rows.reduce((s,r)=>s+(parseFloat(r.annual_value)||0),0);
       const totalNet = totalValue - totalCost;
       const portfolioROI = totalCost > 0 ? Math.round((totalValue/totalCost)*100) : 0;
-      const byStage = {};
+
+      // Stage groupings
+      const liveStages = ["Live","Scaled"];
+      const inflightStages = ["Approved","In development","Piloting"];
+      const earlyStages = ["Assessment","Ideation"];
+
+      const liveRows = rows.filter(r => liveStages.includes(r.stage));
+      const inflightRows = rows.filter(r => inflightStages.includes(r.stage));
+      const earlyRows = rows.filter(r => earlyStages.includes(r.stage));
+
+      // Blocked logic: not on roadmap OR legal needed but not started OR low score with high cost
+      const blockedRows = earlyRows.filter(r =>
+        (r.roadmap && r.roadmap.includes("not on current roadmap")) ||
+        (r.legal_needed === "Yes" && r.legal_status === "Not yet started") ||
+        (r.score_flags && r.score_flags.some(f => f.toLowerCase().includes("not on") || f.toLowerCase().includes("prerequisite") || f.toLowerCase().includes("blocks")))
+      );
+      const notStartedRows = earlyRows.filter(r => !blockedRows.find(b => b.use_case_id === r.use_case_id));
+
+      // Live status inference
+      const liveWithStatus = liveRows.map(r => ({
+        id: r.use_case_id, name: r.name, stage: r.stage,
+        score: r.composite_score, rec: r.recommendation,
+        value: r.annual_value, cost: r.total_cost,
+        realizationOwner: r.realization_owner,
+        flags: r.score_flags || [],
+        summary: r.score_summary,
+        status: r.composite_score >= 70 && (!r.score_flags || r.score_flags.length === 0) ? "On track"
+               : r.composite_score >= 45 ? "Watch"
+               : "At risk"
+      }));
+
+      const inflightMapped = inflightRows.map(r => ({
+        id: r.use_case_id, name: r.name, stage: r.stage,
+        score: r.composite_score, rec: r.recommendation,
+        value: r.annual_value, cost: r.total_cost,
+        goLive: r.go_live_date,
+        flags: r.score_flags || [],
+        constraints: r.constraints
+      }));
+
+      const earlyMapped = notStartedRows.sort((a,b)=>(b.composite_score||0)-(a.composite_score||0)).map(r => ({
+        id: r.use_case_id, name: r.name, stage: r.stage,
+        score: r.composite_score, rec: r.recommendation,
+        value: r.annual_value, cost: r.total_cost,
+        flags: r.score_flags || [],
+        roadmap: r.roadmap
+      }));
+
+      const blockedMapped = blockedRows.map(r => ({
+        id: r.use_case_id, name: r.name, stage: r.stage,
+        score: r.composite_score, value: r.annual_value,
+        flags: r.score_flags || [],
+        legalStatus: r.legal_status, legalNeeded: r.legal_needed,
+        roadmap: r.roadmap, constraints: r.constraints
+      }));
+
       const byBL = {};
       rows.forEach(r => {
-        byStage[r.stage]=(byStage[r.stage]||0)+1;
-        const bl=r.business_line||"Unknown";
+        const bl = r.business_line || "Unknown";
         if(!byBL[bl]) byBL[bl]={count:0,cost:0,value:0};
         byBL[bl].count++; byBL[bl].cost+=parseFloat(r.total_cost)||0; byBL[bl].value+=parseFloat(r.annual_value)||0;
       });
-      const top3 = [...rows].filter(r=>r.composite_score).sort((a,b)=>(b.composite_score||0)-(a.composite_score||0)).slice(0,3).map(r=>({name:r.name,bl:r.business_line,score:r.composite_score,rec:r.recommendation,value:r.annual_value,cost:r.total_cost,netProfit:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0),stage:r.stage,flags:r.score_flags,summary:r.score_summary}));
-      const highRisk = rows.filter(r=>r.model_risk&&(r.model_risk.includes("High")||r.model_risk.includes("Critical"))).map(r=>r.name);
-      const legalGap = rows.filter(r=>r.legal_needed==="Yes"&&r.legal_status==="Not yet started").map(r=>r.name);
-      const unscored = rows.filter(r=>!r.composite_score).map(r=>r.name);
-      const deprioritize = rows.filter(r=>r.recommendation==="Deprioritize").map(r=>({name:r.name,cost:r.total_cost}));
 
       const portfolioData = {
-        totalInitiatives: rows.length, totalCost, totalValue, totalNet, portfolioROI,
-        byStage, byBL, top3, highRisk, legalGap, unscored, deprioritize,
-        scoredCount: rows.filter(r=>r.composite_score).length,
-        prioritizeCount: rows.filter(r=>r.recommendation==="Prioritize").length,
-        reviewCount: rows.filter(r=>r.recommendation==="Review").length,
-        deprioritizeCount: rows.filter(r=>r.recommendation==="Deprioritize").length,
+        summary: {
+          totalInitiatives: rows.length, totalCost, totalValue, totalNet, portfolioROI,
+          liveCount: liveRows.length, inflightCount: inflightRows.length,
+          earlyCount: notStartedRows.length, blockedCount: blockedRows.length,
+          prioritizeCount: rows.filter(r=>r.recommendation==="Prioritize").length,
+          reviewCount: rows.filter(r=>r.recommendation==="Review").length,
+          deprioritizeCount: rows.filter(r=>r.recommendation==="Deprioritize").length,
+          unscoredCount: rows.filter(r=>!r.composite_score).length,
+          avgScore: Math.round(rows.filter(r=>r.composite_score).reduce((s,r)=>s+r.composite_score,0) / Math.max(1,rows.filter(r=>r.composite_score).length)),
+        },
+        live: liveWithStatus,
+        inflight: inflightMapped,
+        notStarted: earlyMapped,
+        blocked: blockedMapped,
+        byBusinessLine: byBL,
+        top3ByScore: [...rows].filter(r=>r.composite_score).sort((a,b)=>b.composite_score-a.composite_score).slice(0,3).map(r=>({id:r.use_case_id,name:r.name,score:r.composite_score,rec:r.recommendation,value:r.annual_value,netProfit:(parseFloat(r.annual_value)||0)-(parseFloat(r.total_cost)||0)})),
       };
 
-      const briefingPrompt = `You are the ARIA AI portfolio intelligence engine. Generate a concise polished executive board briefing for the AI Steering Committee and CFO.
+      const prompt = `You are ARIA, the AI portfolio intelligence engine. Generate a punchy, executive-quality board briefing for the AI Steering Committee and CFO. Do NOT mention any specific firm or company name — refer to the organization as "the firm" or "the portfolio."
 
-Write EXACTLY these 6 sections with these headers (use ## for headers):
+Write EXACTLY these sections with these markdown headers:
 
-## Portfolio snapshot
-2-3 sentences: total initiatives, total investment, projected annual value, net returns, portfolio ROI.
+## Overall assessment
+Write 2 punchy, direct sentences — like a fund manager's verdict on the portfolio. Lead with the strongest signal, then call out the most urgent risk. Use specific numbers. Make it quotable.
 
-## Top priorities this quarter
-The top 3 initiatives to accelerate. For each: name, score, why it should be prioritized. One short paragraph total.
+## At a glance
+A simple data table — no prose here:
+| Metric | Value |
+|---|---|
+| Total initiatives | X |
+| Total investment | $XM |
+| Projected annual value | $XM |
+| Net returns | $XM |
+| Portfolio ROI | X% |
+| Live & delivering | X initiatives |
+| In flight | X initiatives |
+| Blocked | X initiatives |
+| Avg composite score | X/100 |
 
-## Where value is being created
-Which business lines show strongest projected returns. Use specific dollar figures.
+## Live & delivering
+For each live initiative write one row in a table:
+| ID | Initiative | Score | Annual value | Realized status | Key signal |
+With status as one of: ✅ On track / ⚠️ Watch / 🔴 At risk
+Key signal = one short phrase on what the data shows about realization.
+After the table write 1 sentence overall verdict on the live portfolio.
 
-## Risks requiring immediate attention
-Call out: high model risk initiatives, unstarted legal reviews on legally-required cases, unscored initiatives with significant investment. Be direct and specific.
+## In flight
+Table of in-flight initiatives:
+| ID | Initiative | Stage | Score | Go-live | Risk |
+Risk = one word or short phrase (On track / Dependency / Resource gap / Delayed)
+After the table 1 sentence on overall execution health.
 
-## Portfolio recommendations
-3 concrete actions the AI CoE should take this quarter. Specific and actionable.
+## Not yet started
+Table of pipeline initiatives sorted by score descending:
+| ID | Initiative | Stage | Score | Rec | Value at stake | Key blocker |
+Only show top 6 by score. After the table 1 sentence on pipeline quality.
 
-## Success story
-One compelling narrative about the top-scoring initiative for a CFO audience. 2-3 sentences maximum.
+## Blocked — needs AI CoE decision
+Table of blocked initiatives:
+| ID | Initiative | Value at stake | What's blocking it | Decision needed |
+After the table write a direct 1-sentence call to action for the AI CoE.
 
-Tone: confident senior executive. Use specific numbers. Short paragraphs not bullet lists. Under 450 words total.
+## Top 3 recommendations
+Number them 1-3. Each recommendation: bold header (4-6 words) + one sentence of rationale with specific numbers. Make them action-oriented and specific.
 
-LIVE PORTFOLIO DATA:
+## One thing to watch
+One paragraph (3 sentences max). The single most important trend, risk, or opportunity in the portfolio that isn't obvious from the numbers alone. This is your editorial insight — make it sharp.
+
+Tone: confident, direct, senior executive. Use specific numbers everywhere. Tables not paragraphs for the status sections. Under 600 words total. Do not use the firm's name.
+
+PORTFOLIO DATA:
 ` + JSON.stringify(portfolioData, null, 2);
 
       const res = await fetch("https://vdgzijfwtygyetwdxnoh.supabase.co/functions/v1/score-initiative-ts", {
@@ -309,7 +329,7 @@ LIVE PORTFOLIO DATA:
           "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
           "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA",
         },
-        body: JSON.stringify({ submission: { __briefing: true, prompt_override: briefingPrompt } })
+        body: JSON.stringify({ submission: { __briefing: true, prompt_override: prompt } })
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -441,11 +461,49 @@ LIVE PORTFOLIO DATA:
               </div>
             )}
             {briefing && !briefingLoading && (
-              <div style={{ fontSize:14, lineHeight:1.8, color:C.text }}>
+              <div style={{ fontSize:13, lineHeight:1.7, color:C.text }}>
                 {briefing.split("\n").map((line, i) => {
-                  if(line.startsWith("## ")) return <div key={i} style={{ fontSize:13, fontWeight:700, color:"#555", textTransform:"uppercase", letterSpacing:"0.07em", marginTop:i>0?20:0, marginBottom:6, paddingBottom:4, borderBottom:"1px solid #f0f0f0" }}>{line.replace("## ","")}</div>;
-                  if(line.trim()==="") return <div key={i} style={{ height:6 }} />;
-                  return <div key={i} style={{ marginBottom:4 }}>{line}</div>;
+                  // Section headers
+                  if(line.startsWith("## ")) return (
+                    <div key={i} style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", textTransform:"uppercase", letterSpacing:"0.08em", marginTop:i>0?24:0, marginBottom:8, paddingBottom:6, borderBottom:"2px solid #1a1a1a", display:"flex", alignItems:"center", gap:8 }}>
+                      {line.replace("## ","")}
+                    </div>
+                  );
+                  // Table header row (| --- | --- |)
+                  if(line.match(/^\|[\s-]+\|/)) return null;
+                  // Table rows
+                  if(line.startsWith("|") && line.endsWith("|")) {
+                    const cells = line.split("|").filter(c=>c.trim()!=="");
+                    const isHeader = cells.some(c => c.trim().match(/^(ID|Initiative|Stage|Score|Metric|Value|Status|Risk|Rec)/));
+                    return (
+                      <div key={i} style={{ display:"grid", gridTemplateColumns:"repeat("+cells.length+",1fr)", gap:0, borderBottom:"1px solid #f0f0f0" }}>
+                        {cells.map((cell,ci) => (
+                          <div key={ci} style={{ padding:"6px 8px", fontSize:12, fontWeight:isHeader?700:400, color:isHeader?"#555":"#1a1a1a", background:isHeader?"#f8f8f8":"transparent", textAlign:"left", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            {cell.trim()}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+                  // Numbered recommendations
+                  if(line.match(/^[123]\./)) return (
+                    <div key={i} style={{ display:"flex", gap:10, marginBottom:8, marginTop:4, padding:"10px 12px", background:"#f8f8f8", borderRadius:8, borderLeft:"3px solid #1a1a1a" }}>
+                      <span style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", flexShrink:0 }}>{line[0]}.</span>
+                      <span style={{ fontSize:13, color:"#1a1a1a" }}>{line.slice(2).trim().replace(/\*\*(.*?)\*\*/g,"$1")}</span>
+                    </div>
+                  );
+                  // Empty line
+                  if(line.trim()==="") return <div key={i} style={{ height:4 }} />;
+                  // Bold text inline
+                  const boldParts = line.split(/\*\*(.*?)\*\*/g);
+                  return (
+                    <div key={i} style={{ marginBottom:4 }}>
+                      {boldParts.map((part,pi) => pi%2===1
+                        ? <strong key={pi}>{part}</strong>
+                        : <span key={pi}>{part}</span>
+                      )}
+                    </div>
+                  );
                 })}
                 <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid #f0f0f0", display:"flex", gap:10 }}>
                   <button onClick={()=>{ const el=document.createElement("textarea"); el.value=briefing; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); alert("Briefing copied to clipboard"); }} style={{ padding:"8px 16px", border:"1px solid #ccc", borderRadius:8, background:"#fff", color:C.navy, fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit" }}>Copy text</button>
