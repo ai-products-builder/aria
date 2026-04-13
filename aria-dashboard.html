@@ -82,7 +82,7 @@ async function generateBriefing(rows) {
     else summary.byRec.Unscored.push(r.name);
   });
 
-  const prompt = `You are the ARIA AI portfolio intelligence engine for Capital Group. You are generating a concise, polished executive board briefing for senior leadership and the AI Steering Committee.
+  const prompt = `You are the ARIA AI portfolio intelligence engine. You are generating a concise, polished executive board briefing for senior leadership and the AI Steering Committee.
 
 Based on the portfolio data below, write a structured board briefing with these sections:
 
@@ -275,7 +275,7 @@ function ARIADashboard() {
         deprioritizeCount: rows.filter(r=>r.recommendation==="Deprioritize").length,
       };
 
-      const briefingPrompt = `You are the ARIA AI portfolio intelligence engine for Capital Group. Generate a concise polished executive board briefing for the AI Steering Committee and CFO.
+      const briefingPrompt = `You are the ARIA AI portfolio intelligence engine. Generate a concise polished executive board briefing for the AI Steering Committee and CFO.
 
 Write EXACTLY these 6 sections with these headers (use ## for headers):
 
