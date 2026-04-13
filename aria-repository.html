@@ -24,7 +24,7 @@ const { useState, useEffect } = React;
 const SURL = "https://vdgzijfwtygyetwdxnoh.supabase.co";
 const SKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkZ3ppamZ3dHlneWV0d2R4bm9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MDU4OTMsImV4cCI6MjA5MTQ4MTg5M30.KzrufV9Ll1FbJ6toO4u1NSuiKgS3llvMZgCCdPpSVdA";
 
-const SCORE_PROMPT = `You are the ARIA prioritization engine. Score this AI initiative across 6 dimensions (each 1-5):
+const SCORE_PROMPT = `You are the ARIA prioritization engine for Capital Group. Score this AI initiative across 6 dimensions (each 1-5):
 1. strategic_fit: 5=2+ pillars+on roadmap, 4=1-2 pillars+on roadmap, 3=1 pillar not on roadmap, 2=partial, 1=none
 2. expected_impact (annual_value): 5=>$2M, 4=$1M-2M, 3=$500K-1M, 2=$100K-500K, 1=<$100K
 3. feasibility (team/deps/clarity): 5=full team+clear+no blockers, 4=mostly, 3=some gaps, 2=major gaps, 1=none
@@ -509,6 +509,7 @@ function ARIARepository() {
             {loading && <span style={{ fontSize:12, color:"rgba(255,255,255,0.4)" }}>Loading...</span>}
             <span style={{ fontSize:12, color:"rgba(255,255,255,0.5)" }}>{subs.length} submissions</span>
             <a href="index.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>+ New intake</a>
+            <a href="aria-dashboard.html" style={{ fontSize:12, color:"rgba(255,255,255,0.6)", textDecoration:"none" }}>AI Portfolio Overview</a>
           </div>
         </div>
       </div>
